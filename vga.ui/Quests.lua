@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html): a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, up to 384 draft pixels, the owner's third wider less 16; an objective longer than that is broken at its words onto further lines, the count on the first, a pixel between its lines, each line of a done one struck through as long as its words - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
+-- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html): a quest with a time limit shows the time left on a small line under its title, the word first and the time after it, so only the line's end changes, green, yellow in the last two minutes, red in the last thirty seconds; a quest whose targets lie in a dungeon carries the game's word Dungeon after its title, quiet grey - by the game's quest tag, or by Questie's dungeon list for the quest's zone -; a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, up to 384 draft pixels, the owner's third wider less 16; an objective longer than that is broken at its words onto further lines, the count on the first, a pixel between its lines, each line of a done one struck through as long as its words - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
 
 -- {K0260} {K0370} {K0371} {K0390} {K0401} {K0408} {K0422} {K0424}
 
@@ -19,6 +19,10 @@ local DIVIDER = { 0.137, 0.149, 0.173 }
 local TICK = { 0.498, 0.816, 0.416 }
 local WIDTH = 300
 local MOST_WIDTH = 384
+local TIME_GREEN = { 0.37, 0.82, 0.42 }
+local TIME_YELLOW = { 0.95, 0.79, 0.25 }
+local TIME_RED = { 0.93, 0.27, 0.22 }
+local DUNGEON_TAG = 81
 local SPACING = 1
 local OTHERS = { "ObjectiveTrackerFrame", "Questie_BaseFrame" }
 local atan2 = math.atan2 or math.atan
@@ -90,6 +94,8 @@ local function create_quest()
     quest.title:SetJustifyH("LEFT")
     quest.title:SetWordWrap(false)
     quest.distance = library.create_text(quest, "small", colours.quiet)
+    quest.timer = library.create_text(quest, "small", TIME_GREEN)
+    quest.timer:SetJustifyH("LEFT")
     quest.line = quest:CreateTexture(nil, "BORDER")
     quest.line:SetColorTexture(DIVIDER[1], DIVIDER[2], DIVIDER[3], 1)
     quest.objectives = {}
@@ -191,6 +197,18 @@ local function read_map_points(map)
     return points
 end
 
+local function read_dungeon_tag(id)
+    local tag = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(id)
+    return tag ~= nil and tag.tagID == DUNGEON_TAG
+end
+
+local function read_time_left(id)
+    if not C_QuestLog.GetTimeAllowed then return nil end
+    local total, elapsed = C_QuestLog.GetTimeAllowed(id)
+    if not (total and elapsed and total > 0) then return nil end
+    return math.max(0, total - elapsed)
+end
+
 local function read_game_quest(entry, points)
     local id = entry.questID
     local square = C_QuestLog.GetDistanceSqToQuest(id)
@@ -199,6 +217,7 @@ local function read_game_quest(entry, points)
     return {
         id = id, title = entry.title, here = entry.isOnMap, point = points[id], complete = C_QuestLog.IsComplete(id),
         distance = square and math.sqrt(square), objectives = read_objectives(id), level = level, colour = colour,
+        dungeon = read_dungeon_tag(id), left = read_time_left(id),
     }
 end
 
@@ -219,7 +238,9 @@ local function update_from_questie(quest, map)
     local found = loader:ImportModule("QuestieDB").GetQuest(quest.id)
     local spot, zone, _, distance = loader:ImportModule("DistanceUtils").GetNearestSpawnForQuest(found)
     if not spot then return end
-    quest.here = loader:ImportModule("ZoneDB"):GetUiMapIdByAreaId(zone) == map
+    local zones = loader:ImportModule("ZoneDB")
+    quest.here = zones:GetUiMapIdByAreaId(zone) == map
+    quest.dungeon = quest.dungeon or (found.zoneOrSort and found.zoneOrSort > 0 and zones:GetDungeonLocation(found.zoneOrSort) ~= nil)
     quest.point = { spot[1] / 100, spot[2] / 100 }
     quest.distance = distance
 end
@@ -381,6 +402,24 @@ local function update_mark(quest, data, active)
     quest.complete, quest.target = data.complete, data.point
 end
 
+local function read_time_colour(left)
+    if left <= 30 then return TIME_RED end
+    if left <= 120 then return TIME_YELLOW end
+    return TIME_GREEN
+end
+
+local function update_timer(quest, data)
+    quest.timer:SetShown(data.left ~= nil)
+    if not data.left then return 0 end
+    local colour = read_time_colour(data.left)
+    quest.timer:SetFontObject(library.read_frame_font("small"))
+    quest.timer:SetTextColor(colour[1], colour[2], colour[3])
+    quest.timer:SetText(string.format("%s %d:%02d", library.texts.time_left, math.floor(data.left / 60), math.floor(data.left % 60)))
+    quest.timer:ClearAllPoints()
+    quest.timer:SetPoint("TOPLEFT", quest.title, "BOTTOMLEFT", 0, -read_draft(2))
+    return math.ceil(quest.timer:GetStringHeight()) + read_draft(2)
+end
+
 local function update_quest(quest, data, top, width, active)
     local pad, arrow = read_draft(12), read_draft(12)
     quest:ClearAllPoints()
@@ -389,7 +428,7 @@ local function update_quest(quest, data, top, width, active)
     quest.id = data.id
     quest.title:SetFontObject(library.read_frame_font("bold"))
     quest.distance:SetFontObject(library.read_frame_font("small"))
-    quest.title:SetText(data.title)
+    quest.title:SetText(data.dungeon and (data.title .. "  |cff8f8f8f" .. (LFG_TYPE_DUNGEON or library.texts.dungeon) .. "|r") or data.title)
     quest.distance:SetText(vga.render_distance(data.distance))
     quest.arrow:SetSize(arrow, arrow)
     quest.arrow:ClearAllPoints()
@@ -401,7 +440,8 @@ local function update_quest(quest, data, top, width, active)
     quest.title:ClearAllPoints()
     quest.title:SetPoint("TOPLEFT", quest, "TOPLEFT", pad + arrow + read_draft(6), -read_draft(10))
     quest.title:SetPoint("RIGHT", quest.distance, "LEFT", -read_draft(8), 0)
-    local bottom = update_quest_objectives(quest, data, read_draft(10) + math.ceil(quest.title:GetStringHeight()), width) + read_draft(10)
+    local below = update_timer(quest, data)
+    local bottom = update_quest_objectives(quest, data, read_draft(10) + math.ceil(quest.title:GetStringHeight()) + below, width) + read_draft(10)
     quest:SetHeight(bottom)
     quest.line:ClearAllPoints()
     quest.line:SetPoint("BOTTOMLEFT")
@@ -499,6 +539,7 @@ local function update_tracker()
     for index = #shown + 1, #tracker.quests do tracker.quests[index]:Hide() end
     tracker:SetSize(width, update_foot(top, source))
     vga.quest_aim = active or nil
+    vga.update_quest_items(tracker, tracker.quests, shown)
     update_arrows()
 end
 

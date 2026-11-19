@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: LibVGA's frame in the tooltip's look, its rim and ground down to nothing, its place kept with both its own point and the screen's it is measured from, so it stands after a reload exactly where it was let go, fixed but in the edit mode - its own and Blizzard's, whose start and end it follows; while arranging, the handles stand above every element of the game's own; its own, begun by »Anordnen …«, shows a large »Fertig« in VGA's orange in the middle of the screen that ends it; a widget let go is placed freely or, as the settings say, on a grid of eight by eight pixels. A frame that grows towards the middle may keep its place by its outer corner, the upper right on the right half of the screen. Two, six and fifteen seconds after entering the world every placed frame is checked against its saved place and set back where it stands elsewhere, each drift written down for finding its cause, marked where setting it back changes nothing because the screen's edge holds the frame. A place is kept from the nearest edges: the screen is cut into nine fields - corners, edges, middle - and a frame keeps its distance to the edges of its field, the middle to the middle, the distance kept in the owner's screen units and grown or shrunk with the screen like every size, so on another screen it stands in the same relation; a place kept the old way, from the lower left corner, is turned once into the new.
+-- Scope: LibVGA's frame in the tooltip's look, its rim and ground down to nothing, its place kept with both its own point and the screen's it is measured from - a frame that grows, as the quest tracker, always by its upper corner on its side of the screen, so it grows down and towards the middle, a place kept otherwise moved once to that corner -, so it stands after a reload exactly where it was let go, fixed but in the edit mode - its own and Blizzard's, whose start and end it follows; while arranging, the handles stand above every element of the game's own; its own, begun by »Anordnen …«, shows a large »Fertig« in VGA's orange in the middle of the screen that ends it; a widget let go is placed freely or, as the settings say, on a grid of eight by eight pixels. A frame that grows towards the middle may keep its place by its outer corner, the upper right on the right half of the screen. Two, six and fifteen seconds after entering the world every placed frame is checked against its saved place and set back where it stands elsewhere, each drift written down for finding its cause, marked where setting it back changes nothing because the screen's edge holds the frame. A place is kept from the nearest edges: the screen is cut into nine fields - corners, edges, middle - and a frame keeps its distance to the edges of its field, the middle to the middle, the distance kept in the owner's screen units and grown or shrunk with the screen like every size, so on another screen it stands in the same relation; a place kept the old way, from the lower left corner, is turned once into the new.
 
 -- {K0258} {K0299} {K0330} {K0334} {K0383} {K0426} {K0430} {K0446} {K0448}
 
@@ -77,6 +77,7 @@ local function read_zone_point(frame)
     local side = across < width / 3 and "LEFT" or across > width * 2 / 3 and "RIGHT" or ""
     if side == "" and frame.place_outer then side = across > width / 2 and "RIGHT" or "LEFT" end
     local level = down > height * 2 / 3 and "TOP" or down < height / 3 and "BOTTOM" or ""
+    if frame.place_outer then level = "TOP" end
     local point = level .. side
     return point == "" and "CENTER" or point
 end
@@ -220,7 +221,8 @@ end
 local function update_old_place(mover)
     local frame = mover:GetParent()
     local place = LibVGASettings.places and LibVGASettings.places[frame.place_key]
-    if not (place and #place >= 4 and place[1] ~= place[2] and frame:GetLeft()) then return end
+    local stale = place and (place[1] ~= place[2] or (frame.place_outer and not place[1]:find("^TOP")))
+    if not (stale and #place >= 4 and frame:GetLeft()) then return end
     LibVGASettings.places[frame.place_key] = read_saved_place(frame)
     update_place(frame)
 end
