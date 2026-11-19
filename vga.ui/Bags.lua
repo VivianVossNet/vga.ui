@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's bags as the accepted drafts draw them (manual/view/vga-reference.html §3, vga-windows.html A, vga-rewards.html): a dialog of the template, always framed, the backpack and its bags as one grid of ten columns in the game's order, no sorted sections; beneath it every special bag - a profession's bag in one of the four places, the reagent bag in its own - as an area set apart, its name in small capitals above it, a quiver or an ammunition pouch always last; at its head a search field, »Taschen durchsuchen«, and the segmented filters - Alle as a word, then as icons with their word as tooltip: Ausrüstung a breastplate, Verbrauch a bottle, Handwerk a hammer, Quest a question mark, Plunder - the poor, grey items - a teddy -, what does not match darkened whole in its place - icon, edges and glow together, through the frame's own alpha, since the game's item button narrows SetAlpha to its icon and border - so nothing moves; each slot in the template's inset metal, our edge laid over the game's slot, two pixels wide with gently rounded corners - an item's quality from uncommon up in its colour, a quest item and a new one in gold, an empty slot in the metal's grey -, a quest item with a small gold question mark in its lower left corner, a little in from the icon's edge, a kept corner for our rarity's gem once vga.data brings it; a new item brighter, edged and glowing in gold, every three seconds a shimmer running once round its rim that ends in a star flashing at its corner, until it is seen - hovered, or the bags closed; at the foot the slots in use of all and the money with the accepted coins. The game's own bags open and close as ever - B, the bag bar, a merchant, the mailbox -, kept under a hidden parent before they show, so they never appear and never clear their new items, while ours follow them and sound as they did; the bank stays the game's. At the filters' right end a button with the sorting arrows opens the settings on the tab »Taschen«, where the order is chosen (Bagsettings.lua); their size, place and pin are Bagplace.lua's. Using, dragging, selling and the tooltip are the game's own item buttons'.
+-- Scope: vga.ui's bags as the accepted drafts draw them (manual/view/vga-reference.html §3, vga-windows.html A, vga-rewards.html): a dialog of the template, always framed, the backpack and its bags as one grid of ten columns in the game's order, no sorted sections; beneath it every special bag - a profession's bag in one of the four places, the reagent bag in its own - as an area set apart, its name in small capitals above it, a quiver or an ammunition pouch always last; at its head a search field, »Taschen durchsuchen«, and the segmented filters - Alle as a word, then as icons with their word as tooltip: Ausrüstung a breastplate, Verbrauch a bottle, Handwerk a hammer, Quest a question mark, Plunder - the poor, grey items - a teddy -, what does not match darkened whole in its place - icon and edges together, through the frame's own alpha, since the game's item button narrows SetAlpha to its icon and border - so nothing moves; each slot in the template's inset metal, our edge laid over the game's slot, three pixels wide with gently rounded corners - an item's quality from uncommon up in its colour, a new one too, a quest item in gold, an empty slot in the metal's grey -, a quest item with a small gold question mark in its lower left corner, a little in from the icon's edge, a kept corner for our rarity's gem once vga.data brings it; an item new for five minutes - stamped when the game first calls it new, kept over a reload - brighter, without a glow behind it, its edge its quality's, every three seconds a shimmer running once round its rim that ends in a star flashing at its corner, until its five minutes are over; at the foot the slots in use of all and the money with the accepted coins. The game's own bags open and close as ever - B, the bag bar, a merchant, the mailbox -, kept under a hidden parent before they show, so they never appear and never clear their new items, while ours follow them and sound as they did; the bank stays the game's. At the filters' right end a button with the sorting arrows opens the settings on the tab »Taschen«, where the order is chosen (Bagsettings.lua); their size, place and pin are Bagplace.lua's. Using, dragging, selling and the tooltip are the game's own item buttons'.
 
 -- {K0258} {K0259} {K0303} {K0403} {K0405} {K0406} {K0407} {K0409} {K0410} {K0411} {K0412} {K0413} {K0414}
 
@@ -15,7 +15,8 @@ local PAD = 12
 local FIELD = 30
 local FOOT = 30
 local RADIUS = 4
-local EDGE_WIDTH = 2
+local EDGE_WIDTH = 3
+local FRESH_SECONDS = 300
 local DIM = 0.25
 local CYCLE = 3
 local RUN_END = 0.26
@@ -83,9 +84,6 @@ local function create_shimmer(button)
     button.vga_bright:SetAllPoints()
     button.vga_bright:SetColorTexture(1, 1, 1, 0.18)
     button.vga_bright:SetBlendMode("ADD")
-    button.vga_glow = button:CreateTexture(nil, "BACKGROUND", nil, -8)
-    button.vga_glow:SetTexture(library.media .. "SlotGlow")
-    button.vga_glow:SetVertexColor(colours.gold[1], colours.gold[2], colours.gold[3], 0.55)
     button.vga_trail = {}
     for index in ipairs(TRAIL) do
         local dot = button:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -143,22 +141,18 @@ local function update_quest_mark(button, quest)
     button.vga_quest:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT", read_draft(3), read_draft(2))
 end
 
-local function read_edge(item, quest, new)
-    if quest or new then return colours.gold, 1 end
+local function read_edge(item, quest)
+    if quest then return colours.gold, 1 end
     if item and (item.quality or 0) >= UNCOMMON then return { C_Item.GetItemQualityColor(item.quality) }, 1 end
     return SLOT_EDGE, 1
 end
 
 local function update_slot_look(button, item, new, quest)
     local radius = 2 * EDGE_WIDTH
-    local edge, share = read_edge(item, quest, new)
+    local edge, share = read_edge(item, quest)
     library.update_surface(button.vga_ground, 0, radius, SLOT_GROUND, SLOT_GROUND)
     library.update_notches(button.vga_notches, button, radius, colours.ground)
     library.update_ring(button.vga_edge, EDGE_WIDTH, edge, share)
-    local glow = read_draft(SLOT) * 64 / 42
-    button.vga_glow:SetSize(glow, glow)
-    button.vga_glow:SetPoint("CENTER")
-    button.vga_glow:SetShown(new)
     button.vga_bright:SetShown(new)
     if not new then
         for _, dot in ipairs(button.vga_trail) do dot:Hide() end
@@ -166,9 +160,23 @@ local function update_slot_look(button, item, new, quest)
     end
 end
 
+local function check_fresh(bag, slot, item)
+    LibVGASettings.bag_fresh = LibVGASettings.bag_fresh or {}
+    local stamps, key, now = LibVGASettings.bag_fresh, bag .. ":" .. slot, time()
+    if not item then
+        stamps[key] = nil
+        return false
+    end
+    local stamp = stamps[key]
+    if stamp and stamp.link ~= item.hyperlink then stamp = nil end
+    if not stamp and C_NewItems.IsNewItem(bag, slot) == true then stamp = { link = item.hyperlink, at = now } end
+    stamps[key] = stamp and now - stamp.at < FRESH_SECONDS and stamp or nil
+    return stamps[key] ~= nil
+end
+
 local function update_slot(button, bag, slot)
     local item = C_Container.GetContainerItemInfo(bag, slot)
-    local new = item ~= nil and C_NewItems.IsNewItem(bag, slot) == true
+    local new = check_fresh(bag, slot, item)
     SetItemButtonTexture(button, item and item.iconFileID)
     SetItemButtonCount(button, item and item.stackCount or 0)
     SetItemButtonDesaturated(button, item and item.isLocked)
@@ -184,6 +192,7 @@ local function update_slot(button, bag, slot)
     update_quest_mark(button, quest)
     WHOLE_ALPHA(button, check_match(bag, slot, item) and 1 or DIM)
     button.vga_new = new
+    button.vga_at = new and LibVGASettings.bag_fresh[bag .. ":" .. slot].at or nil
     return item ~= nil
 end
 
@@ -228,10 +237,19 @@ local function update_star(button, phase)
     star:SetAlpha(rising and share or 1 - share)
 end
 
+local function update_stale(button)
+    button.vga_new = false
+    button.vga_bright:Hide()
+    for _, dot in ipairs(button.vga_trail) do dot:Hide() end
+    button.vga_star:Hide()
+end
+
 local function update_shimmer()
     local phase, side = (GetTime() % CYCLE) / CYCLE, read_draft(SLOT)
     for _, button in ipairs(bags.slots) do
-        if button:IsShown() and button.vga_new then
+        if button.vga_new and button.vga_at and time() - button.vga_at >= FRESH_SECONDS then
+            update_stale(button)
+        elseif button:IsShown() and button.vga_new then
             update_trail(button, phase, side)
             update_star(button, phase)
         end
@@ -562,3 +580,5 @@ events:SetScript("OnEvent", function(_, event)
     end
 end)
 vga.read_bag_slots = read_bag_slots
+
+vga.read_bag_edge = read_edge

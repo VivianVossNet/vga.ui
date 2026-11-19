@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's own pet bar: ten protected keys of our own on the pet's actions, dressed as the main bar's keys - rounded, a black line, the icon cropped, a gold edge while an action is on or casts by itself -, bound to the player's own pet keys, a click taken on press and on release, as the game's setting to act on key down asks; shown while there is a pet with a bar; standing centred four pixels above the main bar's widget, at the bars' scale, free to be placed in the edit mode. Blizzard's pet bar is put away; nothing protected is moved in a fight.
+-- Scope: vga.ui's own pet bar: ten protected keys of our own on the pet's actions, dressed as the main bar's keys - rounded, a black line, the icon cropped, edged as the bags' slots - three pixels with gently rounded corners over the icon, the slot's grey, gold while an action is on or casts by itself -, bound to the player's own pet keys, a click taken on press and on release, as the game's setting to act on key down asks; shown while there is a pet with a bar; standing centred four pixels above the main bar's widget, at the bars' scale, free to be placed in the edit mode. Blizzard's pet bar is put away; nothing protected is moved in a fight.
 
 -- {K0377}
 
@@ -11,6 +11,8 @@ local DRAFT_BASE = 13
 local KEYS = 10
 local ABOVE = 4
 local BLACK = { 0, 0, 0 }
+local EDGE_WIDTH = 3
+local SLOT_EDGE = { 0.18, 0.192, 0.22 }
 local petbar
 
 local function read_draft(pixels)
@@ -32,7 +34,7 @@ local function create_key(index)
     key.cooldown:SetAllPoints()
     key.line = library.create_surface(key, "BACKGROUND", 0)
     key.notches = library.create_notches(key, "OVERLAY", 7)
-    key.edge = library.create_ring(key, "OVERLAY", 6)
+    key.edge = library.create_ring(key, "OVERLAY", 6, nil, true)
     key.hotkey = library.create_text(key, "caption")
     key:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
     key:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.15)
@@ -43,7 +45,7 @@ local function update_key(key, index)
     local name, texture, token, active, _, automatic = GetPetActionInfo(index)
     key.icon:SetTexture(token and _G[texture] or texture)
     key.icon:SetShown(name ~= nil)
-    for _, piece in pairs(key.edge.pieces) do piece:SetShown((active or automatic) and true or false) end
+    library.update_ring(key.edge, EDGE_WIDTH, (active or automatic) and colours.gold or SLOT_EDGE, 1)
     local start, duration, enabled = GetPetActionCooldown(index)
     if start and duration and enabled then key.cooldown:SetCooldown(start, duration) end
     local binding = GetBindingKey("BONUSACTIONBUTTON" .. index)
@@ -55,7 +57,7 @@ local function update_keys()
 end
 
 local function update_layout()
-    local size, gap, radius = read_draft(30), read_draft(3), read_draft(5)
+    local size, gap, radius = read_draft(30), read_draft(3), 2 * EDGE_WIDTH
     petbar:SetSize(KEYS * size + (KEYS - 1) * gap, size)
     for index, key in ipairs(petbar.keys) do
         key:SetSize(size, size)
@@ -63,7 +65,6 @@ local function update_layout()
         key:SetPoint("LEFT", petbar, "LEFT", (index - 1) * (size + gap), 0)
         library.update_surface(key.line, -1, radius + 1, BLACK, BLACK)
         library.update_notches(key.notches, key, radius, BLACK)
-        library.update_ring(key.edge, 1, colours.gold, 1)
         key.hotkey:SetFontObject(library.read_font("caption"))
         key.hotkey:ClearAllPoints()
         key.hotkey:SetPoint("TOPRIGHT", key, "TOPRIGHT", -read_draft(3), -read_draft(2))
