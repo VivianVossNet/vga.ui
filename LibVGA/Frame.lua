@@ -102,6 +102,17 @@ local function read_saved_place(frame)
     return { point, point, math.floor((across - screen_across / share) / screen + 0.5), math.floor((down - screen_down / share) / screen + 0.5) }
 end
 
+local function update_drag_start(mover)
+    local frame = mover:GetParent()
+    if InCombatLockdown() then return end
+    local left, top = frame:GetLeft(), frame:GetTop()
+    if left and top then
+        frame:ClearAllPoints()
+        frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+    end
+    frame:StartMoving()
+end
+
 function library.create_place(frame, key, point, relative, x, y, relative_point)
     frame.place_key = key
     frame.place_default = { point, relative or UIParent, relative_point or point, x, y }
@@ -116,7 +127,7 @@ function library.create_place(frame, key, point, relative, x, y, relative_point)
     mover.tint = mover:CreateTexture(nil, "OVERLAY")
     mover.tint:SetAllPoints()
     mover.tint:SetColorTexture(colours.gold[1], colours.gold[2], colours.gold[3], 0.18)
-    mover:SetScript("OnDragStart", function() frame:StartMoving() end)
+    mover:SetScript("OnDragStart", update_drag_start)
     mover:SetScript("OnDragStop", function()
         frame:StopMovingOrSizing()
         update_snapped(frame)
@@ -151,11 +162,22 @@ local function update_done(shown)
     done:SetShown(shown)
 end
 
+local function update_unit_watch(frame, on)
+    if not frame.unit_watched then return end
+    if on then
+        UnregisterUnitWatch(frame)
+        frame:Show()
+    else
+        RegisterUnitWatch(frame)
+    end
+end
+
 function library.update_edit(on, own)
     if InCombatLockdown() then return end
     library.editing = on
     for _, mover in pairs(movers) do
         mover:SetShown(on)
+        update_unit_watch(mover:GetParent(), on)
     end
     update_done(on and own or false)
 end

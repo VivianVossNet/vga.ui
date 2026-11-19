@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The experience bar as the accepted draft draws it (manual/view/vga-xp.html, V1a): above it the level and the share in the light ink at the left, the rested bonus white at the right, without one a quiet »kein Bonus«, both set in far enough that the gryphons never cover them, between them, in the bonus's former gold, the time left to the next level, reckoned from the experience of the last fifteen minutes and refreshed every minute or after every fight as the settings say, and while none came an infinity sign, ∞, drawn in the game's ARIALN as Geologica has none, 1.6 times the text's size, its box's middle on the row's; all three to be switched off; then the frame rate, the world latency and the addons' memory, 60 fps · 42 ms · 38 MB, and the money with the accepted coins (manual/view/vga-windows.html), each switched on and off, and the bag slots in use of all, »35/40«, yellow with ten or fewer left, orange with fewer than five, red when none is; the row laid as a table of equal columns over the width between the insets - level, values, time, money, slots, bonus -, the first column's content left-aligned, the last's right-aligned, every middle one's centred, and a column switched off or not needed gone, the others sharing its room; on its own tab of the settings, its colour chosen from six swatches; the bar the mage's blue by default, without the fine light streaks - gold, silver, bronze, our orange or the hunter's green as the settings say -, its colour darkened a little towards grey while no rested bonus is left, rounded, in a black line, with ten fine divisions, moving like every other bar of LibVGA; the rested bonus, as the game shows it, a fainter underlay of the bar's colour at 0.3 opacity reaching beyond the fill as far as the bonus goes. While a faction is watched the bar shows its reputation instead, in the same colour hatched with light diagonal strokes: »Ruf« with the standing's name and the share at the left, the faction's name at the right, without a time column. Laid by the main bar between its rows.
+-- Scope: The experience bar as the accepted draft draws it (manual/view/vga-xp.html, V1a): above it the level and the share in the light ink at the left, the rested bonus white at the right, without one a quiet »kein Bonus«, both set in far enough that the gryphons never cover them, between them, in the bonus's former gold, the time left to the next level, reckoned from the experience of the last fifteen minutes and refreshed every minute or after every fight as the settings say, and while none came »NA«, in the row's own font; all three to be switched off; then the frame rate, the world latency and the addons' memory, 60 fps · 42 ms · 38 MB, and the money with the accepted coins (manual/view/vga-windows.html), each switched on and off, and the bag slots in use of all, »35/40«, yellow with ten or fewer left, orange with fewer than five, red when none is; the row laid as a table of equal columns over the width between the insets - level, time, values, money, slots, bonus -, the first column's content left-aligned, the last's right-aligned, every middle one's centred, and a column switched off or not needed gone, the others sharing its room; on its own tab of the settings, its colour chosen from six swatches; the bar the mage's blue by default, without the fine light streaks - gold, silver, bronze, our orange or the hunter's green as the settings say -, its colour darkened a little towards grey while no rested bonus is left, rounded, in a black line, with ten fine divisions, moving like every other bar of LibVGA; the rested bonus, as the game shows it, a fainter underlay of the bar's colour at 0.3 opacity reaching beyond the fill as far as the bonus goes. While a faction is watched the bar shows its reputation instead, in the same colour hatched with light diagonal strokes: »Ruf« with the standing's name and the share at the left, the faction's name at the right, without a time column. Laid by the main bar between its rows.
 
 -- {K0298} {K0300} {K0375} {K0378} {K0383} {K0388} {K0397} {K0404} {K0428} {K0430} {K0437} {K0451}
 
@@ -26,9 +26,7 @@ local ALARM = { 0.93, 0.27, 0.22 }
 local ORANGE = { 0.96, 0.55, 0.2 }
 local WHITE = { 1, 1, 1 }
 local MEMORY_EVERY = 10
-local IDLE = "\226\136\158"
-local SIGN_FONT = "Fonts\\ARIALN.TTF"
-local SIGN_SCALE = 1.6
+local IDLE = "NA"
 local memory = { used = 0, read = 0 }
 
 local function read_draft(pixels)
@@ -45,7 +43,7 @@ function vga.create_experience(parent)
     block.money = library.create_money(block, LABEL)
     block.slots = library.create_text(block, "body", LABEL)
     block.left:SetText("")
-    block.cells = { block.level, block.system, block.left, block.money, block.slots, block.bonus }
+    block.cells = { block.level, block.left, block.system, block.money, block.slots, block.bonus }
     vga.experience_block = block
     block.bar = library.create_bar(block, "gold")
     block.divisions = {}
@@ -245,17 +243,6 @@ local function update_progress(block, faction, most, bonus)
     library.update_bar_value(block.bar, have, most)
 end
 
-local function update_left_font(block)
-    local font = library.read_frame_font("body")
-    block.left:SetFontObject(font)
-    block.left.lift = 0
-    if block.left:GetText() ~= IDLE then return end
-    local _, size, flags = font:GetFont()
-    size = size or library.read_size(0)
-    block.left:SetFont(SIGN_FONT, size * SIGN_SCALE, flags)
-    block.left.lift = size * (SIGN_SCALE - 1) / 2
-end
-
 local function read_cell_point(index, count)
     if index == 1 then return "TOPLEFT", 0 end
     if index == count then return "TOPRIGHT", 1 end
@@ -273,7 +260,7 @@ local function update_columns(block)
     for index, cell in ipairs(shown) do
         local point, share = read_cell_point(index, #shown)
         cell:ClearAllPoints()
-        cell:SetPoint(point, block, "TOPLEFT", inset + (index - 1 + share) * width, cell.lift or 0)
+        cell:SetPoint(point, block, "TOPLEFT", inset + (index - 1 + share) * width, 0)
     end
 end
 
@@ -290,7 +277,7 @@ function vga.update_experience(block)
     block.level:SetShown(vga.read_experience_labels())
     block.bonus:SetShown(vga.read_experience_labels())
     block.left:SetShown(vga.read_experience_labels() and faction == nil)
-    update_left_font(block)
+    block.left:SetFontObject(library.read_frame_font("body"))
     block.system:SetFontObject(library.read_frame_font("body"))
     update_extras(block)
     if faction then
@@ -339,12 +326,10 @@ local function update_estimate()
     end
     if total <= 0 then
         block.left:SetText(IDLE)
-        update_left_font(block)
         update_columns(block)
         return
     end
     block.left:SetText(render_left((most - have) / (total / elapsed)))
-    update_left_font(block)
     update_columns(block)
 end
 

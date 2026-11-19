@@ -236,6 +236,7 @@ local function create_frame(unit, mirrored)
     end
     if unit ~= "player" then
         RegisterUnitWatch(frame)
+        frame.unit_watched = true
     end
     frames[unit] = frame
     return frame

@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: Two transparent arcs either side of the character, wide enough to clear it and centred on its middle, as manual/view/vga-hud.html draws them (D): twelve segments each, lit one by one; an arc with nothing to show fades slowly out, each on its own, and back in when it has. Each side shows what the settings choose - the range, the threat, the target's cast or its health, the player's own resource, named as the game names the class's power - Mana, Wut, Energie, for a druid all three -, filling the arc in the power bar's colour, with or without a target, a rogue's or cat's combo points as five beads beside it, lit gold when earned -, or nothing -, by default the range at the left and the threat at the right. The range to an attackable target filling from its foot as the target comes nearer - the distance known in steps by the game's own range checks - the player's harmful spells and a few items, each at the range the game gives its spell, and the interact distances of 10 and 28 yards -, shown as the smallest step the target stands within, »>« before the largest when beyond it -, its lit segments in one colour that tells the reach - green while the target stands well within the best range of the player's class, through yellow as it nears that range's edge, red beyond it, one red segment where it stands beyond every step; the threat drawn from the target fills in the threat meter's five colours, the health in green, each segment set by the game from the value even where it is secret; the target's cast fills as it runs, gold while it can be interrupted, grey while not, its spell's name at the head - for the moment to interrupt. Each arc's value stands at its head or its foot, or not at all, as the settings say. Free to be placed while arranging.
+-- Scope: Two transparent arcs either side of the character, wide enough to clear it and centred on its middle, as manual/view/vga-hud.html draws them (D): twelve segments each, lit one by one; an arc with nothing to show fades slowly out, each on its own, and back in when it has. Each side shows what the settings choose - the range, the threat, the target's cast or its health, the player's own resource, named as the game names the class's power - Mana, Wut, Energie, for a druid all three -, filling the arc in the power bar's colour, with or without a target, a rogue's or cat's combo points as five beads beside it, lit gold when earned -, or nothing -, by default the range at the left and the threat at the right. The range to an attackable target filling from its foot as the target comes nearer - the distance known in steps by the game's own range checks - the player's harmful spells and a few items, each at the range the game gives its spell, and the interact distances of 10 and 28 yards -, shown as the smallest step the target stands within, »>« before the largest when beyond it -, its lit segments in one colour that tells the reach - red when the target stands near, through orange and yellow to a deep green at the edge of the best range of the player's class, by the steps' yards -; every segment grey where it stands beyond that range or beyond every step; the threat drawn from the target fills in the threat meter's five colours, the health in green, each segment set by the game from the value even where it is secret; the target's cast fills as it runs, gold while it can be interrupted, grey while not, its spell's name at the head - for the moment to interrupt. Each arc's value stands at its head or its foot, or not at all, as the settings say. Free to be placed while arranging.
 
 -- {K0392} {K0393} {K0395} {K0400} {K0416} {K0417} {K0418}
 
@@ -15,11 +15,9 @@ local STEP = 0.01
 local FADE = 1.5
 local TRACK = { 0, 0, 0, 0.35 }
 local GREY = { 0.54, 0.55, 0.57 }
-local EASY = 0.5
 local MELEE = 10
-local RED = { 0.9, 0.28, 0.24 }
-local YELLOW = { 0.95, 0.79, 0.25 }
-local GREEN = { 0.35, 0.77, 0.36 }
+local REACH = { { 0.9, 0.28, 0.24 }, { 0.96, 0.55, 0.2 }, { 0.95, 0.79, 0.25 }, { 0.16, 0.6, 0.27 } }
+local OUT_OF_REACH = { 0.45, 0.46, 0.48 }
 local HEALTH = { 0.37, 0.82, 0.42 }
 local MARK_OPEN = { 0.2, 0.21, 0.24 }
 local COMBO_MARKS = 5
@@ -37,9 +35,10 @@ local function read_mix(from, to, share)
 end
 
 local function read_range_colour(yards, best_yards, best)
-    if not best then return RED end
-    local share = math.max(0, math.min(1, (yards / best_yards - EASY) / (1 - EASY)))
-    return read_mix(GREEN, YELLOW, share)
+    if not yards or (yards > best_yards and not best) then return OUT_OF_REACH end
+    local place = math.max(0, math.min(1, yards / best_yards)) * (#REACH - 1)
+    local from = math.min(math.floor(place) + 1, #REACH - 1)
+    return read_mix(REACH[from], REACH[from + 1], place - (from - 1))
 end
 
 local function create_segment(side)
@@ -163,7 +162,8 @@ local function update_range(side)
     side.wanted = (yards or foe) and 1 or 0
     local share = yards and (RANGE_MOST - yards) / RANGE_MOST or 0
     local lit, best = math.max(foe and 1 or 0, math.ceil(share * SEGMENTS)), yards and check_best_range()
-    local colour = read_range_colour(yards or RANGE_MOST, read_best_yards(), best)
+    local colour = read_range_colour(yards, read_best_yards(), best)
+    if colour == OUT_OF_REACH then lit = SEGMENTS end
     for index, segment in ipairs(side.segments) do
         segment:SetStatusBarColor(colour[1], colour[2], colour[3], 0.9)
         segment:SetMinMaxValues(0, STEP)
@@ -360,3 +360,5 @@ events:SetScript("OnEvent", function(_, event)
     if event == "SPELLS_CHANGED" and arcs then library.update_safely("arcs checks", write_checks) end
     library.update_safely("arcs", update_values)
 end)
+
+vga.read_range_colour = read_range_colour

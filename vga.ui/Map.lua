@@ -248,6 +248,12 @@ local function update_zoom()
     zoom_in:SetPoint("BOTTOM", zoom_out, "TOP", 0, gap)
 end
 
+local function update_blob_rings()
+    for _, name in ipairs({ "SetQuestBlobRingScalar", "SetQuestBlobRingAlpha", "SetArchBlobRingScalar", "SetArchBlobRingAlpha", "SetTaskBlobRingScalar", "SetTaskBlobRingAlpha" }) do
+        if Minimap[name] then Minimap[name](Minimap, 0) end
+    end
+end
+
 local function update_map()
     local side, height = read_visible()
     local ratio = read_map_ratio()
@@ -256,6 +262,7 @@ local function update_map()
     update_corner(side, height)
     update_zoom()
     Minimap:SetMaskTexture(library.media .. MASKS[read_shape()])
+    update_blob_rings()
     for _, art in ipairs({ MinimapCompassTexture, MinimapCompassTextureUnderlay }) do art:SetAlpha(0) end
     frame.view:ClearAllPoints()
     frame.view:SetPoint("CENTER", Minimap, "CENTER")

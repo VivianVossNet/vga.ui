@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html): a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, so no text runs out - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
+-- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html): a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, up to 384 draft pixels, the owner's third wider less 16; an objective longer than that is broken at its words onto further lines, the count on the first, a pixel between its lines, each line of a done one struck through as long as its words - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
 
 -- {K0260} {K0370} {K0371} {K0390} {K0401} {K0408} {K0422} {K0424}
 
@@ -18,6 +18,8 @@ local SOURCE = { 0.525, 0.725, 0.91 }
 local DIVIDER = { 0.137, 0.149, 0.173 }
 local TICK = { 0.498, 0.816, 0.416 }
 local WIDTH = 300
+local MOST_WIDTH = 384
+local SPACING = 1
 local OTHERS = { "ObjectiveTrackerFrame", "Questie_BaseFrame" }
 local atan2 = math.atan2 or math.atan
 local tracker
@@ -31,11 +33,11 @@ local function create_objective(parent)
     local objective = CreateFrame("Frame", nil, parent)
     objective.text = library.create_text(objective, "body", OBJECTIVE)
     objective.text:SetJustifyH("LEFT")
-    objective.text:SetWordWrap(false)
+    objective.text:SetWordWrap(true)
+    objective.text:SetSpacing(SPACING)
     objective.count = library.create_text(objective, "body", OBJECTIVE)
     objective.dot = library.create_bead(objective, "ARTWORK", 0)
-    objective.strike = objective:CreateTexture(nil, "OVERLAY")
-    objective.strike:SetColorTexture(DONE[1], DONE[2], DONE[3], 1)
+    objective.strikes = {}
     objective.bar = CreateFrame("Frame", nil, objective)
     objective.bar.track = library.create_surface(objective.bar, "ARTWORK", 0)
     objective.bar.fill = CreateFrame("Frame", nil, objective.bar)
@@ -279,6 +281,41 @@ local function update_bar(bar, share)
     library.update_surface(bar.fill.surface, 0, radius, colours.gold, colours.gold)
 end
 
+local function read_text_width(text, kind)
+    local measure = tracker.measure
+    measure:SetFontObject(library.read_frame_font(kind))
+    measure:SetText(text or "")
+    if measure.GetUnboundedStringWidth then return measure:GetUnboundedStringWidth() end
+    return measure:GetStringWidth()
+end
+
+local function read_lines(text, width)
+    local lines, line = {}, ""
+    for word in (text or ""):gmatch("%S+") do
+        local tried = line == "" and word or line .. " " .. word
+        if line ~= "" and read_text_width(tried, "body") > width then
+            lines[#lines + 1], line = line, word
+        else
+            line = tried
+        end
+    end
+    lines[#lines + 1] = line
+    return lines
+end
+
+local function update_strikes(objective, lines, line, shown)
+    for index, words in ipairs(lines) do
+        local strike = objective.strikes[index] or objective:CreateTexture(nil, "OVERLAY")
+        strike:SetColorTexture(DONE[1], DONE[2], DONE[3], 1)
+        strike:ClearAllPoints()
+        strike:SetPoint("LEFT", objective.text, "TOPLEFT", 0, -((index - 1) * (line + SPACING) + line / 2))
+        strike:SetSize(math.max(1, read_text_width(words, "body")), 1)
+        strike:SetShown(shown)
+        objective.strikes[index] = strike
+    end
+    for index = #lines + 1, #objective.strikes do objective.strikes[index]:Hide() end
+end
+
 local function update_objective(objective, data, top, width, colour_of_quest)
     local pad, done = read_draft(12), data.done
     local colour = done and DONE or OBJECTIVE
@@ -287,33 +324,34 @@ local function update_objective(objective, data, top, width, colour_of_quest)
     objective:SetWidth(width - 2 * pad)
     objective.text:SetFontObject(library.read_frame_font("body"))
     objective.count:SetFontObject(library.read_frame_font("body"))
-    objective.text:SetText(data.text)
-    objective.count:SetText(data.need > 0 and (data.have .. "/" .. data.need) or "")
+    local count = data.need > 0 and (data.have .. "/" .. data.need) or ""
+    local column = read_draft(12)
+    local room = width - 2 * pad - column - read_draft(6) - read_draft(8) - read_text_width(count, "body")
+    local lines = read_lines(data.text, room)
+    objective.text:SetText(table.concat(lines, "\n"))
+    objective.count:SetText(count)
     objective.text:SetTextColor(colour[1], colour[2], colour[3])
     objective.count:SetTextColor(colour[1], colour[2], colour[3])
-    local line = math.ceil(objective.text:GetStringHeight())
+    local line = math.ceil(objective.count:GetStringHeight())
+    local lines_height = line * #lines + SPACING * (#lines - 1)
     objective.count:ClearAllPoints()
     objective.count:SetPoint("TOPRIGHT")
     local dot = read_draft(5)
     objective.dot:SetSize(dot, dot)
     objective.dot:SetVertexColor(colour_of_quest.r, colour_of_quest.g, colour_of_quest.b, 1)
-    local column = read_draft(12)
     objective.dot:ClearAllPoints()
     objective.dot:SetPoint("CENTER", objective, "TOPLEFT", column / 2, -line / 2)
     objective.text:ClearAllPoints()
     objective.text:SetPoint("TOPLEFT", objective, "TOPLEFT", column + read_draft(6), 0)
     objective.text:SetPoint("RIGHT", objective.count, "LEFT", -read_draft(8), 0)
-    objective.strike:ClearAllPoints()
-    objective.strike:SetPoint("LEFT", objective.text, "LEFT")
-    objective.strike:SetSize(math.min(objective.text:GetStringWidth(), objective.text:GetWidth()), 1)
-    objective.strike:SetShown(done and true or false)
+    update_strikes(objective, lines, line, done and true or false)
     local bar = read_draft(3)
     objective.bar:ClearAllPoints()
-    objective.bar:SetPoint("TOPLEFT", objective, "TOPLEFT", 0, -(line + read_draft(5)))
+    objective.bar:SetPoint("TOPLEFT", objective, "TOPLEFT", 0, -(lines_height + read_draft(5)))
     objective.bar:SetSize(width - 2 * pad, bar)
     objective.bar:SetShown(not done)
     update_bar(objective.bar, data.need > 0 and math.min(data.have / data.need, 1) or 0)
-    local height = line + (done and 0 or read_draft(5) + bar)
+    local height = lines_height + (done and 0 or read_draft(5) + bar)
     objective:SetHeight(height)
     return height
 end
@@ -414,14 +452,6 @@ local function update_others()
     end
 end
 
-local function read_text_width(text, kind)
-    local measure = tracker.measure
-    measure:SetFontObject(library.read_frame_font(kind))
-    measure:SetText(text or "")
-    if measure.GetUnboundedStringWidth then return measure:GetUnboundedStringWidth() end
-    return measure:GetStringWidth()
-end
-
 local function read_quest_width(data)
     local pad = read_draft(12)
     local widest = 2 * pad + read_draft(12) + read_draft(6) + read_text_width(data.title, "bold") + read_draft(8) + read_text_width(vga.render_distance(data.distance), "small")
@@ -437,7 +467,8 @@ local function read_width(shown, total)
     local pad = read_draft(12)
     local head = 2 * pad + read_draft(16) + read_draft(8) + read_text_width(library.texts.quests_zone, "bold") + read_draft(16) + read_text_width(shown and (#shown .. " " .. library.texts.of .. " " .. total) or "", "small") + read_draft(14)
     local widest = math.max(read_draft(WIDTH), head)
-    for _, data in ipairs(shown) do widest = math.max(widest, read_quest_width(data)) end
+    local most = read_draft(MOST_WIDTH)
+    for _, data in ipairs(shown) do widest = math.max(widest, math.min(read_quest_width(data), most)) end
     return math.ceil(widest)
 end
 
