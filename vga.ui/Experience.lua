@@ -1,0 +1,398 @@
+-- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
+-- SPDX-License-Identifier: BSD-3-Clause
+-- Scope: The experience bar as the accepted draft draws it (manual/view/vga-xp.html, V1a): above it the level and the share in the light ink at the left, the rested bonus white at the right, without one a quiet »kein Bonus«, both set in far enough that the gryphons never cover them, between them, in the bonus's former gold, the time left to the next level, reckoned from the experience of the last fifteen minutes and refreshed every minute or after every fight as the settings say, and while none came a nudge: »Kämpfen Du musst, wenn Leveln Du willst«; all three to be switched off; at fixed places - halfway between the left edge and the middle, and between the middle and the right edge, so that they never move with the words beside them - the frame rate, the world latency and the addons' memory, 60 fps · 42 ms · 38 MB, and the money with the accepted coins (manual/view/vga-windows.html), each switched on and off, a little apart behind the money the bag slots in use of all, »35/40«, yellow with ten or fewer left, orange with fewer than five, red when none is; on its own tab of the settings, its colour chosen from six swatches; the bar the mage's blue by default, without the fine light streaks - gold, silver, bronze, our orange or the hunter's green as the settings say -, its colour darkened a little towards grey while no rested bonus is left, rounded, in a black line, with ten fine divisions, moving like every other bar of LibVGA; the rested bonus, as the game shows it, a fainter underlay of the bar's colour at three quarters opacity reaching beyond the fill as far as the bonus goes. While a faction is watched the bar shows its reputation instead, in the same colour hatched with light diagonal strokes: »Ruf« with the standing's name and the share at the left, the faction's name at the right, the time to the next standing between them, reckoned like the time to level. Laid by the main bar between its rows.
+
+-- {K0298} {K0300} {K0375} {K0378} {K0383} {K0388} {K0397} {K0404} {K0428} {K0430} {K0437}
+
+local _, vga = ...
+local library = LibVGA
+local DRAFT_BASE = 13
+local DIVISIONS = 10
+local INSET = 40
+local SHADES = { "gold", "silver", "bronze", "orange", "hunter", "mage" }
+local SWATCHES = { { 0.894, 0.718, 0.314 }, { 0.788, 0.808, 0.839 }, { 0.753, 0.541, 0.322 }, { 0.941, 0.541, 0.165 }, { 0.498, 0.69, 0.29 }, { 0.353, 0.604, 0.878 } }
+local WINDOW = 900
+local MINUTE = 60
+local gains = {}
+local seen = {}
+local rep_gains = {}
+local rep_seen = {}
+local LABEL = { 0.914, 0.902, 0.875 }
+local SLOTS_GAP = 16
+local BONUS = { 0.945, 0.812, 0.431 }
+local HATCH_ALPHA = 0.22
+local RESTED_ALPHA = 0.75
+local SPENT_GREY = { 0.45, 0.46, 0.48 }
+local SPENT_SHARE = 0.35
+local WARM = { 1, 0.82, 0.25 }
+local ALARM = { 0.93, 0.27, 0.22 }
+local ORANGE = { 0.96, 0.55, 0.2 }
+local WHITE = { 1, 1, 1 }
+local MEMORY_EVERY = 10
+local memory = { used = 0, read = 0 }
+
+local function read_draft(pixels)
+    return math.floor(pixels * library.read_base() / DRAFT_BASE + 0.5)
+end
+
+function vga.create_experience(parent)
+    local block = CreateFrame("Frame", nil, parent)
+    block.level = library.create_text(block, "body", LABEL)
+    block.bonus = library.create_text(block, "body", LABEL)
+    block.left = library.create_text(block, "body", BONUS)
+    block.system = library.create_text(block, "body", LABEL)
+    block.system:SetJustifyH("CENTER")
+    block.money = library.create_money(block, LABEL)
+    block.slots = library.create_text(block, "body", LABEL)
+    block.left_half = CreateFrame("Frame", nil, block)
+    block.right_half = CreateFrame("Frame", nil, block)
+    block.left:SetPoint("TOP")
+    block.left:SetText("")
+    vga.experience_block = block
+    block.bar = library.create_bar(block, "gold")
+    block.divisions = {}
+    for index = 1, DIVISIONS - 1 do
+        local division = block.bar:CreateTexture(nil, "OVERLAY", nil, 1)
+        division:SetColorTexture(0, 0, 0, 0.4)
+        block.divisions[index] = division
+    end
+    block.hatch = block.bar:CreateTexture(nil, "ARTWORK", nil, 2)
+    block.hatch:SetTexture(library.media .. "Hatch", "REPEAT", "REPEAT")
+    block.hatch:SetHorizTile(true)
+    block.hatch:SetVertTile(true)
+    block.hatch:SetAllPoints(block.bar:GetStatusBarTexture())
+    block.hatch:SetAlpha(HATCH_ALPHA)
+    block.rested = CreateFrame("StatusBar", nil, block.bar)
+    block.rested:SetAllPoints()
+    block.rested:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+    vga.create_experience_tips(block)
+    return block
+end
+
+function vga.read_experience_labels()
+    return LibVGASettings.xp_labels ~= "off"
+end
+
+local function read_memory()
+    local now = GetTime()
+    if now - memory.read < MEMORY_EVERY then return memory.used end
+    memory.read = now
+    local update = UpdateAddOnMemoryUsage or (C_AddOns and C_AddOns.UpdateAddOnMemoryUsage)
+    local usage = GetAddOnMemoryUsage or (C_AddOns and C_AddOns.GetAddOnMemoryUsage)
+    local count = (C_AddOns and C_AddOns.GetNumAddOns and C_AddOns.GetNumAddOns()) or (GetNumAddOns and GetNumAddOns()) or 0
+    if not (update and usage) then return memory.used end
+    update()
+    local total = 0
+    for index = 1, count do total = total + (usage(index) or 0) end
+    memory.used = total
+    return total
+end
+
+local function read_warning_colour(value, yellow, red, rising)
+    local share = rising and (value - yellow * 0.5) / (yellow * 0.5) or (yellow * 1.5 - value) / (yellow * 0.5)
+    local from, to = WHITE, WARM
+    if (rising and value >= yellow) or (not rising and value <= yellow) then
+        share = rising and (value - yellow) / (red - yellow) or (yellow - value) / (yellow - red)
+        from, to = WARM, ALARM
+    end
+    share = math.max(0, math.min(1, share))
+    local mixed = {}
+    for index = 1, 3 do mixed[index] = from[index] + (to[index] - from[index]) * share end
+    return mixed
+end
+
+local function read_warning(value, yellow, red, rising)
+    local mixed = read_warning_colour(value, yellow, red, rising)
+    return string.format("|cff%02x%02x%02x", math.floor(mixed[1] * 255 + 0.5), math.floor(mixed[2] * 255 + 0.5), math.floor(mixed[3] * 255 + 0.5))
+end
+
+local function read_system()
+    local _, _, _, world = GetNetStats()
+    return math.floor((GetFramerate() or 0) + 0.5), world or 0, math.floor(read_memory() / 1024 + 0.5)
+end
+
+local function render_system()
+    local frames, latency, used = read_system()
+    return string.format("%s%d fps|r · %s%d ms|r · %s%d MB|r", read_warning(frames, 30, 24, false), frames, read_warning(latency, 150, 300, true), latency, read_warning(used, 150, 300, true), used)
+end
+
+local function read_slots_colour(free)
+    if free <= 0 then return ALARM end
+    if free < 5 then return ORANGE end
+    if free <= 10 then return WARM end
+    return LABEL
+end
+
+local function update_extras(block)
+    if not block then return end
+    local shown = vga.read_experience_labels()
+    block.system:SetShown(shown and LibVGASettings.xp_system ~= "off")
+    block.money:SetShown(shown and LibVGASettings.xp_money ~= "off")
+    block.system:SetText(render_system())
+    library.update_money(block.money, GetMoney())
+    block.slots:SetShown(block.money:IsShown())
+    block.slots:SetFontObject(library.read_frame_font("body"))
+    local used, total = vga.read_bag_slots()
+    block.slots:SetText(string.format("%d/%d", used, total))
+    block.slots:SetTextColor(unpack(read_slots_colour(total - used)))
+end
+
+function vga.read_experience_shade()
+    for index, shade in ipairs(SHADES) do
+        if shade == LibVGASettings.xp_colour then return index, shade end
+    end
+    return 6, SHADES[6]
+end
+
+local function check_loose()
+    return LibVGASettings.mainbar_form == "loose"
+end
+
+local function create_experience_page(page)
+    local texts = library.texts
+    local swatches = {}
+    for index, colour in ipairs(SWATCHES) do swatches[index] = { colour = colour } end
+    local shade = library.create_row(page, texts.xp_colour)
+    shade.control = library.create_pictures(shade, swatches, vga.read_experience_shade(), function(index)
+        library.update_choice_setting("xp_colour", SHADES[index])
+    end, "swatch")
+    page.rows = {
+        library.create_choice_row(page, texts.xp_labels, { texts.on, texts.off }, vga.read_experience_labels() and 1 or 2, function(index)
+            library.update_choice_setting("xp_labels", index == 1 and "on" or "off")
+        end),
+        library.create_choice_row(page, texts.system_values, { texts.on, texts.off }, LibVGASettings.xp_system == "off" and 2 or 1, function(index)
+            library.update_choice_setting("xp_system", index == 1 and "on" or "off")
+        end),
+        library.create_choice_row(page, texts.money, { texts.on, texts.off }, LibVGASettings.xp_money == "off" and 2 or 1, function(index)
+            library.update_choice_setting("xp_money", index == 1 and "on" or "off")
+        end),
+        shade,
+        library.create_choice_row(page, texts.xp_time, { texts.every_minute, texts.after_fight }, LibVGASettings.xp_pace == "fight" and 2 or 1, function(index)
+            library.update_choice_setting("xp_pace", index == 2 and "fight" or "minute")
+        end),
+    }
+    for _, row in ipairs(library.create_widget_rows(page, "experience", {
+        { key = "xpbar", title = texts.xp_bar, sized = true, when = check_loose },
+    })) do page.rows[#page.rows + 1] = row end
+end
+
+library.create_element("experience", { title = library.texts.experience, icon = "TabExperience", tab = create_experience_page })
+
+function vga.read_experience_height()
+    return (vga.read_experience_labels() and library.read_size(0) + read_draft(5) or 0) + read_draft(14)
+end
+
+local function update_marks(block, height)
+    local width = block.bar:GetWidth()
+    for index, division in ipairs(block.divisions) do
+        division:ClearAllPoints()
+        division:SetPoint("TOPLEFT", block.bar, "TOPLEFT", math.floor(width * index / DIVISIONS + 0.5), 0)
+        division:SetSize(1, height)
+    end
+end
+
+local function read_mixed(colour, other, share)
+    return CreateColor(colour[1] + (other[1] - colour[1]) * share, colour[2] + (other[2] - colour[2]) * share, colour[3] + (other[3] - colour[3]) * share, 1)
+end
+
+local function update_fill(block, shade, spent)
+    local top, bottom = library.read_bar_colours(shade)
+    local share = spent and SPENT_SHARE or 0
+    block.bar:GetStatusBarTexture():SetGradient("VERTICAL", read_mixed(bottom, SPENT_GREY, share), read_mixed(top, SPENT_GREY, share))
+    block.rested:SetStatusBarColor(top[1], top[2], top[3], RESTED_ALPHA)
+end
+
+local function read_reputation()
+    local watched = C_Reputation and C_Reputation.GetWatchedFactionData and C_Reputation.GetWatchedFactionData()
+    if watched and watched.name then
+        local low, high = watched.currentReactionThreshold or 0, watched.nextReactionThreshold or 0
+        return { name = watched.name, reaction = watched.reaction, have = (watched.currentStanding or 0) - low, most = math.max(high - low, 0), standing = watched.currentStanding or 0, top = high }
+    end
+    if GetWatchedFactionInfo then
+        local name, reaction, low, high, value = GetWatchedFactionInfo()
+        if name then return { name = name, reaction = reaction, have = value - low, most = math.max(high - low, 0), standing = value, top = high } end
+    end
+    return nil
+end
+
+local function read_standing_name(reaction)
+    return _G["FACTION_STANDING_LABEL" .. tostring(reaction)] or ""
+end
+
+local function update_reputation_texts(block, faction)
+    local share = faction.most > 0 and math.min(faction.have / faction.most, 1) or 1
+    block.level:SetText(string.format("%s %s · %d %%", library.texts.reputation_short, read_standing_name(faction.reaction), math.floor(share * 100)))
+    block.bonus:SetText(faction.name)
+    block.bonus:SetTextColor(unpack(LABEL))
+end
+
+local function update_progress(block, faction, most, bonus)
+    local _, shade = vga.read_experience_shade()
+    library.update_bar_kind(block.bar, shade)
+    block.mode = faction and "reputation" or "experience"
+    block.hatch:SetShown(faction ~= nil)
+    if faction then
+        update_fill(block, shade, false)
+        block.rested:Hide()
+        library.update_bar_value(block.bar, faction.most > 0 and faction.have or 1, faction.most > 0 and faction.most or 1)
+        return
+    end
+    update_fill(block, shade, bonus <= 0)
+    local have = UnitXP("player") or 0
+    block.rested:SetShown(bonus > 0)
+    block.rested:SetMinMaxValues(0, most)
+    block.rested:SetValue(math.min(have + bonus * most, most))
+    block.rested:SetFrameLevel(math.max(0, block.bar:GetFrameLevel() - 1))
+    library.update_bar_value(block.bar, have, most)
+end
+
+function vga.update_experience(block)
+    local most = UnitXPMax("player") or 0
+    block:SetShown(most > 0)
+    if most <= 0 then return end
+    local height = read_draft(14)
+    local share = math.min((UnitXP("player") or 0) / most, 1)
+    local bonus = (GetXPExhaustion() or 0) / most
+    block.level:SetFontObject(library.read_frame_font("body"))
+    block.bonus:SetFontObject(library.read_frame_font("body"))
+    local faction = read_reputation()
+    block.level:SetShown(vga.read_experience_labels())
+    block.bonus:SetShown(vga.read_experience_labels())
+    block.left:SetShown(vga.read_experience_labels())
+    block.left:SetFontObject(library.read_frame_font("body"))
+    block.system:SetFontObject(library.read_frame_font("body"))
+    update_extras(block)
+    if faction then
+        update_reputation_texts(block, faction)
+    else
+        block.level:SetText(string.format("%s %d · %d %%", library.texts.level_short, UnitLevel("player") or 0, math.floor(share * 100)))
+        block.bonus:SetText(bonus > 0 and string.format("%s +%d %%", library.texts.rested, math.floor(bonus * 100 + 0.5)) or library.texts.no_bonus)
+        block.bonus:SetTextColor(unpack(bonus > 0 and LABEL or library.colours.quiet))
+    end
+    local inset = read_draft(INSET)
+    local line = library.read_size(0) + read_draft(5)
+    block.left_half:ClearAllPoints()
+    block.left_half:SetPoint("TOPLEFT", block, "TOPLEFT", inset, 0)
+    block.left_half:SetPoint("TOPRIGHT", block, "TOP")
+    block.left_half:SetHeight(line)
+    block.right_half:ClearAllPoints()
+    block.right_half:SetPoint("TOPLEFT", block, "TOP")
+    block.right_half:SetPoint("TOPRIGHT", block, "TOPRIGHT", -inset, 0)
+    block.right_half:SetHeight(line)
+    block.system:ClearAllPoints()
+    block.system:SetPoint("TOP", block.left_half, "TOP")
+    block.money:ClearAllPoints()
+    block.money:SetPoint("TOP", block.right_half, "TOP")
+    block.money:SetHeight(line)
+    block.slots:ClearAllPoints()
+    block.slots:SetPoint("TOPLEFT", block.money, "TOPRIGHT", read_draft(SLOTS_GAP), 0)
+    block.level:ClearAllPoints()
+    block.level:SetPoint("TOPLEFT", block, "TOPLEFT", inset, 0)
+    block.bonus:ClearAllPoints()
+    block.bonus:SetPoint("TOPRIGHT", block, "TOPRIGHT", -inset, 0)
+    block.bar:ClearAllPoints()
+    block.bar:SetPoint("BOTTOMLEFT")
+    block.bar:SetPoint("BOTTOMRIGHT")
+    block.bar:SetHeight(height)
+    library.update_bar_shape(block.bar, read_draft(4))
+    update_progress(block, faction, most, bonus)
+    update_marks(block, height)
+end
+
+local function render_left(seconds)
+    local texts = library.texts
+    local hours, minutes = math.floor(seconds / 3600), math.ceil((seconds % 3600) / MINUTE)
+    if hours > 0 then return string.format("~%d %s %d %s", hours, texts.hours, minutes, texts.minutes) end
+    return string.format("~%d %s", math.max(minutes, 1), texts.minutes)
+end
+
+local function read_window_total(list, now)
+    local total = 0
+    for index = #list, 1, -1 do
+        if now - list[index][1] > WINDOW then table.remove(list, index) else total = total + list[index][2] end
+    end
+    return total
+end
+
+local function update_reputation_estimate(block, faction, now)
+    local total = read_window_total(rep_gains, now)
+    local elapsed = math.min(WINDOW, now - (seen.since or now))
+    if total <= 0 or elapsed <= 0 or faction.top <= faction.standing then
+        block.left:SetText("")
+        return
+    end
+    block.left:SetText(render_left((faction.top - faction.standing) / (total / elapsed)))
+end
+
+local function update_estimate()
+    local block = vga.experience_block
+    if not block then return end
+    local now = GetTime()
+    local faction = read_reputation()
+    if faction then
+        update_reputation_estimate(block, faction, now)
+        return
+    end
+    local total = read_window_total(gains, now)
+    local elapsed = math.min(WINDOW, now - (seen.since or now))
+    local most, have = UnitXPMax("player") or 0, UnitXP("player") or 0
+    if most <= 0 or elapsed <= 0 then
+        block.left:SetText("")
+        return
+    end
+    if total <= 0 then
+        block.left:SetText(library.texts.xp_idle)
+        return
+    end
+    block.left:SetText(render_left((most - have) / (total / elapsed)))
+end
+
+local function write_gain()
+    local have, most = UnitXP("player") or 0, UnitXPMax("player") or 0
+    if seen.have then
+        local gained = have >= seen.have and have - seen.have or (seen.most - seen.have) + have
+        if gained > 0 then gains[#gains + 1] = { GetTime(), gained } end
+    end
+    seen.have, seen.most = have, most
+end
+
+local function write_rep_gain()
+    local faction = read_reputation()
+    if not faction then return end
+    if rep_seen.name == faction.name and faction.standing > (rep_seen.standing or faction.standing) then
+        rep_gains[#rep_gains + 1] = { GetTime(), faction.standing - rep_seen.standing }
+    elseif rep_seen.name ~= faction.name then
+        rep_gains = {}
+    end
+    rep_seen.name, rep_seen.standing = faction.name, faction.standing
+end
+
+local function update_faction()
+    write_rep_gain()
+    if vga.experience_block then vga.update_experience(vga.experience_block) end
+    update_estimate()
+end
+
+local events = CreateFrame("Frame")
+for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_XP_UPDATE", "PLAYER_REGEN_ENABLED", "PLAYER_MONEY", "UPDATE_FACTION" }) do events:RegisterEvent(name) end
+events:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_LOGIN" then
+        seen.since = GetTime()
+        write_gain()
+        C_Timer.After(1, function() library.update_safely("experience estimate", update_estimate) end)
+        C_Timer.NewTicker(1, function() library.update_safely("experience values", update_extras, vga.experience_block) end)
+        C_Timer.NewTicker(MINUTE, function()
+            if LibVGASettings.xp_pace ~= "fight" then library.update_safely("experience estimate", update_estimate) end
+        end)
+    elseif event == "PLAYER_XP_UPDATE" then
+        write_gain()
+    elseif event == "UPDATE_FACTION" then
+        library.update_safely("experience reputation", update_faction)
+    elseif event == "PLAYER_MONEY" then
+        library.update_safely("experience money", update_extras, vga.experience_block)
+    elseif LibVGASettings.xp_pace == "fight" then
+        library.update_safely("experience estimate", update_estimate)
+    end
+end)
+
+vga.read_system, vga.read_warning_colour = read_system, read_warning_colour
