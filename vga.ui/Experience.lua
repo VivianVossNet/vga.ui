@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The experience bar as the accepted draft draws it (manual/view/vga-xp.html, V1a): above it the level and the share in the light ink at the left, the rested bonus white at the right, without one a quiet »kein Bonus«, both set in far enough that the gryphons never cover them, between them, in the bonus's former gold, the time left to the next level, reckoned from the experience of the last fifteen minutes and refreshed every minute or after every fight as the settings say, and while none came a nudge: »Kämpfen Du musst, wenn Leveln Du willst«; all three to be switched off; at fixed places - halfway between the left edge and the middle, and between the middle and the right edge, so that they never move with the words beside them - the frame rate, the world latency and the addons' memory, 60 fps · 42 ms · 38 MB, and the money with the accepted coins (manual/view/vga-windows.html), each switched on and off, a little apart behind the money the bag slots in use of all, »35/40«, yellow with ten or fewer left, orange with fewer than five, red when none is; on its own tab of the settings, its colour chosen from six swatches; the bar the mage's blue by default, without the fine light streaks - gold, silver, bronze, our orange or the hunter's green as the settings say -, its colour darkened a little towards grey while no rested bonus is left, rounded, in a black line, with ten fine divisions, moving like every other bar of LibVGA; the rested bonus, as the game shows it, a fainter underlay of the bar's colour at three quarters opacity reaching beyond the fill as far as the bonus goes. While a faction is watched the bar shows its reputation instead, in the same colour hatched with light diagonal strokes: »Ruf« with the standing's name and the share at the left, the faction's name at the right, the time to the next standing between them, reckoned like the time to level. Laid by the main bar between its rows.
+-- Scope: The experience bar as the accepted draft draws it (manual/view/vga-xp.html, V1a): above it the level and the share in the light ink at the left, the rested bonus white at the right, without one a quiet »kein Bonus«, both set in far enough that the gryphons never cover them, between them, in the bonus's former gold, the time left to the next level, reckoned from the experience of the last fifteen minutes and refreshed every minute or after every fight as the settings say, and while none came an infinity sign, ∞, drawn in the game's ARIALN as Geologica has none, 1.6 times the text's size, its box's middle on the row's; all three to be switched off; then the frame rate, the world latency and the addons' memory, 60 fps · 42 ms · 38 MB, and the money with the accepted coins (manual/view/vga-windows.html), each switched on and off, and the bag slots in use of all, »35/40«, yellow with ten or fewer left, orange with fewer than five, red when none is; the row laid as a table of equal columns over the width between the insets - level, values, time, money, slots, bonus -, the first column's content left-aligned, the last's right-aligned, every middle one's centred, and a column switched off or not needed gone, the others sharing its room; on its own tab of the settings, its colour chosen from six swatches; the bar the mage's blue by default, without the fine light streaks - gold, silver, bronze, our orange or the hunter's green as the settings say -, its colour darkened a little towards grey while no rested bonus is left, rounded, in a black line, with ten fine divisions, moving like every other bar of LibVGA; the rested bonus, as the game shows it, a fainter underlay of the bar's colour at 0.3 opacity reaching beyond the fill as far as the bonus goes. While a faction is watched the bar shows its reputation instead, in the same colour hatched with light diagonal strokes: »Ruf« with the standing's name and the share at the left, the faction's name at the right, without a time column. Laid by the main bar between its rows.
 
--- {K0298} {K0300} {K0375} {K0378} {K0383} {K0388} {K0397} {K0404} {K0428} {K0430} {K0437}
+-- {K0298} {K0300} {K0375} {K0378} {K0383} {K0388} {K0397} {K0404} {K0428} {K0430} {K0437} {K0451}
 
 local _, vga = ...
 local library = LibVGA
@@ -15,13 +15,10 @@ local WINDOW = 900
 local MINUTE = 60
 local gains = {}
 local seen = {}
-local rep_gains = {}
-local rep_seen = {}
 local LABEL = { 0.914, 0.902, 0.875 }
-local SLOTS_GAP = 16
 local BONUS = { 0.945, 0.812, 0.431 }
 local HATCH_ALPHA = 0.22
-local RESTED_ALPHA = 0.75
+local RESTED_ALPHA = 0.3
 local SPENT_GREY = { 0.45, 0.46, 0.48 }
 local SPENT_SHARE = 0.35
 local WARM = { 1, 0.82, 0.25 }
@@ -29,6 +26,9 @@ local ALARM = { 0.93, 0.27, 0.22 }
 local ORANGE = { 0.96, 0.55, 0.2 }
 local WHITE = { 1, 1, 1 }
 local MEMORY_EVERY = 10
+local IDLE = "\226\136\158"
+local SIGN_FONT = "Fonts\\ARIALN.TTF"
+local SIGN_SCALE = 1.6
 local memory = { used = 0, read = 0 }
 
 local function read_draft(pixels)
@@ -44,10 +44,8 @@ function vga.create_experience(parent)
     block.system:SetJustifyH("CENTER")
     block.money = library.create_money(block, LABEL)
     block.slots = library.create_text(block, "body", LABEL)
-    block.left_half = CreateFrame("Frame", nil, block)
-    block.right_half = CreateFrame("Frame", nil, block)
-    block.left:SetPoint("TOP")
     block.left:SetText("")
+    block.cells = { block.level, block.system, block.left, block.money, block.slots, block.bonus }
     vga.experience_block = block
     block.bar = library.create_bar(block, "gold")
     block.divisions = {}
@@ -66,6 +64,7 @@ function vga.create_experience(parent)
     block.rested:SetAllPoints()
     block.rested:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
     vga.create_experience_tips(block)
+    block:SetScript("OnSizeChanged", vga.update_experience)
     return block
 end
 
@@ -246,6 +245,38 @@ local function update_progress(block, faction, most, bonus)
     library.update_bar_value(block.bar, have, most)
 end
 
+local function update_left_font(block)
+    local font = library.read_frame_font("body")
+    block.left:SetFontObject(font)
+    block.left.lift = 0
+    if block.left:GetText() ~= IDLE then return end
+    local _, size, flags = font:GetFont()
+    size = size or library.read_size(0)
+    block.left:SetFont(SIGN_FONT, size * SIGN_SCALE, flags)
+    block.left.lift = size * (SIGN_SCALE - 1) / 2
+end
+
+local function read_cell_point(index, count)
+    if index == 1 then return "TOPLEFT", 0 end
+    if index == count then return "TOPRIGHT", 1 end
+    return "TOP", 0.5
+end
+
+local function update_columns(block)
+    local inset = read_draft(INSET)
+    local shown = {}
+    for _, cell in ipairs(block.cells) do
+        if cell:IsShown() then shown[#shown + 1] = cell end
+    end
+    local width = math.max(0, (block:GetWidth() or 0) - 2 * inset) / math.max(#shown, 1)
+    block.money:SetHeight(library.read_size(0) + read_draft(5))
+    for index, cell in ipairs(shown) do
+        local point, share = read_cell_point(index, #shown)
+        cell:ClearAllPoints()
+        cell:SetPoint(point, block, "TOPLEFT", inset + (index - 1 + share) * width, cell.lift or 0)
+    end
+end
+
 function vga.update_experience(block)
     local most = UnitXPMax("player") or 0
     block:SetShown(most > 0)
@@ -258,8 +289,8 @@ function vga.update_experience(block)
     local faction = read_reputation()
     block.level:SetShown(vga.read_experience_labels())
     block.bonus:SetShown(vga.read_experience_labels())
-    block.left:SetShown(vga.read_experience_labels())
-    block.left:SetFontObject(library.read_frame_font("body"))
+    block.left:SetShown(vga.read_experience_labels() and faction == nil)
+    update_left_font(block)
     block.system:SetFontObject(library.read_frame_font("body"))
     update_extras(block)
     if faction then
@@ -269,27 +300,7 @@ function vga.update_experience(block)
         block.bonus:SetText(bonus > 0 and string.format("%s +%d %%", library.texts.rested, math.floor(bonus * 100 + 0.5)) or library.texts.no_bonus)
         block.bonus:SetTextColor(unpack(bonus > 0 and LABEL or library.colours.quiet))
     end
-    local inset = read_draft(INSET)
-    local line = library.read_size(0) + read_draft(5)
-    block.left_half:ClearAllPoints()
-    block.left_half:SetPoint("TOPLEFT", block, "TOPLEFT", inset, 0)
-    block.left_half:SetPoint("TOPRIGHT", block, "TOP")
-    block.left_half:SetHeight(line)
-    block.right_half:ClearAllPoints()
-    block.right_half:SetPoint("TOPLEFT", block, "TOP")
-    block.right_half:SetPoint("TOPRIGHT", block, "TOPRIGHT", -inset, 0)
-    block.right_half:SetHeight(line)
-    block.system:ClearAllPoints()
-    block.system:SetPoint("TOP", block.left_half, "TOP")
-    block.money:ClearAllPoints()
-    block.money:SetPoint("TOP", block.right_half, "TOP")
-    block.money:SetHeight(line)
-    block.slots:ClearAllPoints()
-    block.slots:SetPoint("TOPLEFT", block.money, "TOPRIGHT", read_draft(SLOTS_GAP), 0)
-    block.level:ClearAllPoints()
-    block.level:SetPoint("TOPLEFT", block, "TOPLEFT", inset, 0)
-    block.bonus:ClearAllPoints()
-    block.bonus:SetPoint("TOPRIGHT", block, "TOPRIGHT", -inset, 0)
+    update_columns(block)
     block.bar:ClearAllPoints()
     block.bar:SetPoint("BOTTOMLEFT")
     block.bar:SetPoint("BOTTOMRIGHT")
@@ -314,25 +325,11 @@ local function read_window_total(list, now)
     return total
 end
 
-local function update_reputation_estimate(block, faction, now)
-    local total = read_window_total(rep_gains, now)
-    local elapsed = math.min(WINDOW, now - (seen.since or now))
-    if total <= 0 or elapsed <= 0 or faction.top <= faction.standing then
-        block.left:SetText("")
-        return
-    end
-    block.left:SetText(render_left((faction.top - faction.standing) / (total / elapsed)))
-end
-
 local function update_estimate()
     local block = vga.experience_block
     if not block then return end
     local now = GetTime()
-    local faction = read_reputation()
-    if faction then
-        update_reputation_estimate(block, faction, now)
-        return
-    end
+    if read_reputation() then return end
     local total = read_window_total(gains, now)
     local elapsed = math.min(WINDOW, now - (seen.since or now))
     local most, have = UnitXPMax("player") or 0, UnitXP("player") or 0
@@ -341,10 +338,14 @@ local function update_estimate()
         return
     end
     if total <= 0 then
-        block.left:SetText(library.texts.xp_idle)
+        block.left:SetText(IDLE)
+        update_left_font(block)
+        update_columns(block)
         return
     end
     block.left:SetText(render_left((most - have) / (total / elapsed)))
+    update_left_font(block)
+    update_columns(block)
 end
 
 local function write_gain()
@@ -356,19 +357,7 @@ local function write_gain()
     seen.have, seen.most = have, most
 end
 
-local function write_rep_gain()
-    local faction = read_reputation()
-    if not faction then return end
-    if rep_seen.name == faction.name and faction.standing > (rep_seen.standing or faction.standing) then
-        rep_gains[#rep_gains + 1] = { GetTime(), faction.standing - rep_seen.standing }
-    elseif rep_seen.name ~= faction.name then
-        rep_gains = {}
-    end
-    rep_seen.name, rep_seen.standing = faction.name, faction.standing
-end
-
 local function update_faction()
-    write_rep_gain()
     if vga.experience_block then vga.update_experience(vga.experience_block) end
     update_estimate()
 end

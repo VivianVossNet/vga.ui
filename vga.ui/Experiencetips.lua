@@ -1,13 +1,15 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The experience line's tooltips: every text on it explains itself when the mouse rests on it - the level, the rested bonus, the time to the next level, the system values, the money and the bag slots -; the system values' tooltip carries beneath its words three fine graphs of the last sixty minutes, frame rate, latency and memory, measured every thirty seconds and kept across a reload, each stretch coloured as the line colours its value, so a recent trouble shows at a glance.
+-- Scope: The experience line's tooltips: every text on it explains itself when the mouse has rested on it for a second - the level, the rested bonus, the time to the next level, the system values, the money and the bag slots -; the system values' tooltip carries beneath its words three fine graphs of the last sixty minutes, frame rate, latency and memory, measured every thirty seconds and kept across a reload, each stretch coloured as the line colours its value, so a recent trouble shows at a glance.
 
--- {K0388} {K0404} {K0428}
+-- {K0388} {K0404} {K0428} {K0455}
 
 local _, vga = ...
 local library = LibVGA
 local colours = library.colours
 local DRAFT_BASE = 13
+local DWELL = 1
+local waiting, pending
 local EVERY = 30
 local SPAN = 3600
 local BROKEN = 90
@@ -109,6 +111,7 @@ local function update_graphs()
 end
 
 local function render_tip(hover)
+    if not hover.region:IsShown() then return end
     local texts = library.texts
     local reputation = hover.reputation and hover:GetParent().mode == "reputation"
     local title, lines = hover.title, hover.lines
@@ -124,7 +127,20 @@ local function render_tip_safely(hover)
     library.update_safely("experience tip", render_tip, hover)
 end
 
+local function render_pending()
+    waiting = nil
+    if pending then render_tip_safely(pending) end
+end
+
+local function render_tip_later(hover)
+    if waiting then waiting:Cancel() end
+    pending = hover
+    waiting = C_Timer.NewTimer(DWELL, render_pending)
+end
+
 local function update_left()
+    if waiting then waiting:Cancel() end
+    waiting, pending = nil, nil
     GameTooltip:Hide()
 end
 
@@ -134,8 +150,8 @@ local function create_hover(block, region, title, lines, with_graphs, reputation
     hover:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT")
     hover:EnableMouse(true)
     if hover.SetMouseClickEnabled then hover:SetMouseClickEnabled(false) end
-    hover.title, hover.lines, hover.graphs, hover.reputation = title, lines, with_graphs, reputation
-    hover:SetScript("OnEnter", render_tip_safely)
+    hover.title, hover.lines, hover.graphs, hover.reputation, hover.region = title, lines, with_graphs, reputation, region
+    hover:SetScript("OnEnter", render_tip_later)
     hover:SetScript("OnLeave", update_left)
     return hover
 end
@@ -143,7 +159,7 @@ end
 local function create_hovers(block)
     create_hover(block, block.level, "level", { "tip_level" }, false, { "reputation_short", "tip_reputation" })
     create_hover(block, block.bonus, "tip_bonus_title", { "tip_bonus" }, false, { "faction", "tip_faction" })
-    create_hover(block, block.left, "xp_time", { "tip_time" }, false, { "rep_time", "tip_rep_time" })
+    create_hover(block, block.left, "xp_time", { "tip_time" })
     create_hover(block, block.system, "system_values", { "tip_fps", "tip_ms", "tip_mb", "tip_history" }, true)
     create_hover(block, block.money, "money", { "tip_money" })
     create_hover(block, block.slots, "bag_slots", { "tip_slots" })
