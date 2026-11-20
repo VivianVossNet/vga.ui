@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: Two transparent arcs either side of the character, wide enough to clear it and centred on its middle, as manual/view/vga-hud.html draws them (D): twelve segments each, lit one by one - or, as the settings say (arc_shape), half arcs, half as high, of six segments for the same values, the beads closer together -; an arc with nothing to show fades slowly out, each on its own, and back in when it has. Each side shows what the settings choose - the range, the threat, the target's cast or its health, the player's own health - filled in green as the target's, with or without a target -, the player's own resource, named as the game names the class's power - Mana, Wut, Energie, for a druid all three -, filling the arc in the power bar's colour, with or without a target, a rogue's or cat's combo points as five beads beside it, lit in VGA's orange when earned -, or nothing -, by default the range at the left and the threat at the right. The range to an attackable target filling from its foot as the target comes nearer - the distance known in steps by the game's own range checks - the player's harmful spells and a few items, each at the range the game gives its spell, and the interact distances of 10 and 28 yards -, shown as the smallest step the target stands within, »>« before the largest when beyond it -, its lit segments in one colour that tells the reach - red when the target stands near, through orange and yellow to a deep green at the edge of the best range of the player's class, by the steps' yards -; every segment grey where it stands beyond that range or beyond every step; the threat drawn from the target fills in the threat meter's five colours, the health in green, each segment set by the game from the value even where it is secret; the target's cast fills as it runs, gold while it can be interrupted, grey while not, its spell's name at the head - for the moment to interrupt. Each arc's value stands at its head or its foot, or not at all, as the settings say. Free to be placed while arranging.
+-- Scope: Two transparent arcs either side of the character, wide enough to clear it and centred on its middle, as manual/view/vga-hud.html draws them (D): twelve segments each, lit one by one - or, as the settings say (arc_shape), half arcs, half as high, of six segments for the same values, the beads closer together -; behind each arc, as the settings say (»Rahmen«, off by default), a broad stroke of the frames' own ground and opacity, rounded at its ends, eight draft pixels clear of the segments and beads all round, so the arc reads on a light ground (K0563); an arc with nothing to show fades slowly out, each on its own, and back in when it has. Each side shows what the settings choose - the range, the threat, the target's cast or its health, the player's own health - filled in green as the target's, with or without a target -, the player's own resource, named as the game names the class's power - Mana, Wut, Energie, for a druid all three -, filling the arc in the power bar's colour, with or without a target, a rogue's or cat's combo points as five beads beside it, lit in VGA's orange when earned -, or nothing -, by default the range at the left and the threat at the right. The range to an attackable target filling from its foot as the target comes nearer - the distance known in steps by the game's own range checks - the player's harmful spells and a few items, each at the range the game gives its spell, and the interact distances of 10 and 28 yards -, shown as the smallest step the target stands within, »>« before the largest when beyond it -, its lit segments in one colour that tells the reach - red when the target stands near, through orange and yellow to a deep green at the edge of the best range of the player's class, by the steps' yards -; every segment grey where it stands beyond that range or beyond every step; the threat drawn from the target fills in the threat meter's five colours, the health in green, each segment set by the game from the value even where it is secret; the target's cast fills as it runs, gold while it can be interrupted, grey while not, its spell's name at the head - for the moment to interrupt. Each arc's value stands at its head or its foot, or not at all, as the settings say. At each arc's foot a small gold corner, the only part of the arcs that takes the mouse, opens the settings on the arcs' tab, where every change shows live; there each arc is one row with a pop-up menu whose sections are »Ich« - the resource, the own health - and »Ziel« - range, threat, cast, health -, then none (K0564, K0565). Free to be placed while arranging.
 
--- {K0392} {K0393} {K0395} {K0400} {K0416} {K0417} {K0418} {K0501} {K0502}
+-- {K0392} {K0393} {K0395} {K0400} {K0416} {K0417} {K0418} {K0501} {K0502} {K0563} {K0564} {K0574}
 
 local _, vga = ...
 local library = LibVGA
@@ -21,8 +21,17 @@ local OUT_OF_REACH = { 0.45, 0.46, 0.48 }
 local HEALTH = { 0.37, 0.82, 0.42 }
 local MARK_OPEN = { 0.2, 0.21, 0.24 }
 local COMBO_MARKS = 5
+local BAND_GROUND = { 0.071, 0.075, 0.09 }
+local CORNER_OUT = 22
+local BANDS = {
+    full = { file = "ArcBandFull", left = -177.5, top = 146.73, width = 128, height = 512 },
+    half = { file = "ArcBandHalf", left = -177.5, top = 83.82, width = 64, height = 256 },
+}
 local BEST = { HUNTER = 75, MAGE = 133, WARLOCK = 686, PRIEST = 585, DRUID = 5176, SHAMAN = 403, WARRIOR = 78, ROGUE = 1752 }
 local RANGE_ITEMS = { 8149, 10645, 835, 4941, 18904, 13289, 9328, 7734, 4945, 17202 }
+local SAMPLE = 67
+local SAMPLE_YARDS = 13
+local previews = {}
 local checks = {}
 local arcs
 
@@ -73,12 +82,43 @@ local function create_side(mirror)
     side:SetAllPoints(arcs)
     side.mirror = mirror
     side.segments = {}
+    side.band = side:CreateTexture(nil, "BACKGROUND")
+    side.band:Hide()
     for index = 1, SEGMENTS do side.segments[index] = create_segment(side) end
     side.value = library.create_text(side, "small", library.colours.ink)
     side.wanted = 0
     side:SetAlpha(0)
     side:SetScript("OnUpdate", update_fade)
     return side
+end
+
+local function update_band(side)
+    local band, shape = side.band, LibVGASettings.arc_shape == "half" and BANDS.half or BANDS.full
+    band:SetShown(LibVGASettings.arc_band == "on")
+    if not band:IsShown() then return end
+    local ground = library.read_ground()
+    band:SetTexture(library.media .. shape.file)
+    band:SetVertexColor(BAND_GROUND[1], BAND_GROUND[2], BAND_GROUND[3], ground)
+    band:SetSize(read_draft(shape.width), read_draft(shape.height))
+    band:ClearAllPoints()
+    if side.mirror < 0 then
+        band:SetTexCoord(0, 1, 0, 1)
+        band:SetPoint("TOPLEFT", arcs, "CENTER", read_draft(shape.left), read_draft(shape.top))
+    else
+        band:SetTexCoord(1, 0, 0, 1)
+        band:SetPoint("TOPRIGHT", arcs, "CENTER", -read_draft(shape.left), read_draft(shape.top))
+    end
+end
+
+local function update_arc_corner(side, radius)
+    local corner = side.corner
+    if not corner then return end
+    local size, angle = library.read_size(-2), math.rad(-read_span() / 2)
+    local reach = radius + read_draft(CORNER_OUT)
+    corner:SetSize(size, size)
+    corner:ClearAllPoints()
+    corner:SetPoint("CENTER", arcs, "CENTER", side.mirror * reach * math.cos(angle), reach * math.sin(angle))
+    if side.mirror < 0 then corner.art:SetTexCoord(1, 0, 1, 0) else corner.art:SetTexCoord(0, 1, 1, 0) end
 end
 
 local function update_side_layout(side)
@@ -95,6 +135,8 @@ local function update_side_layout(side)
         segment:GetStatusBarTexture():SetRotation(turn)
         segment.track:SetRotation(turn)
     end
+    update_band(side)
+    update_arc_corner(side, radius)
     local foot = LibVGASettings.arc_values == "bottom"
     local head = math.rad((foot and -1 or 1) * read_span() / 2)
     side.value:SetFontObject(library.read_font("small"))
@@ -289,6 +331,20 @@ local function read_show(side)
     return SHOWS[chosen] and chosen or nil
 end
 
+local function read_sample_colour(show, index)
+    if show == "threat" then return read_threat_colour(index) end
+    if show == "range" then return REACH[4] end
+    return show == "cast" and library.colours.gold or HEALTH
+end
+
+local function update_preview(side, show, target)
+    side.wanted = 1
+    if target or show == "resource" or show == "own_health" then return end
+    update_by_game(side, SAMPLE, function(index) return read_sample_colour(show, index) end)
+    if show == "range" then side.value:SetText(vga.render_distance(SAMPLE_YARDS)) end
+    if show == "cast" then side.value:SetText(library.texts.cast_arc) end
+end
+
 local function update_values()
     if not arcs then return end
     local target = check_target()
@@ -304,6 +360,7 @@ local function update_values()
         elseif show then
             SHOWS[show](side)
         end
+        if previews[side.key] and show then update_preview(side, show, target) end
     end
 end
 
@@ -323,10 +380,6 @@ local function read_resource_name()
     return token and _G[token] or library.texts.resource_arc
 end
 
-local function read_kinds()
-    local texts = library.texts
-    return { "range", "threat", "cast", "health", "own_health", "resource", "off" }, { texts.range_arc, texts.threat_arc, texts.cast_arc, texts.health_arc, texts.own_health_arc, read_resource_name(), texts.off }
-end
 local PLACES = { "top", "bottom", "off" }
 
 local function read_place(list, wanted, fallback)
@@ -336,11 +389,26 @@ local function read_place(list, wanted, fallback)
     return 1
 end
 
-local function create_side_row(page, label, key, fallback)
-    local kinds, labels = read_kinds()
-    return library.create_choice_row(page, label, labels, read_place(kinds, LibVGASettings[key], fallback), function(index)
-        library.update_choice_setting(key, kinds[index])
+local function create_side_row(page, side, key, fallback)
+    local texts = library.texts
+    local sections = {
+        { title = texts.arc_own, items = { { "resource", read_resource_name() }, { "own_health", texts.own_health_arc } } },
+        { title = texts.arc_target, items = { { "range", texts.range_arc }, { "threat", texts.threat_arc }, { "cast", texts.cast_arc }, { "health", texts.health_arc } } },
+        { items = { { "off", texts.off } } },
+    }
+    local row = library.create_row(page, side)
+    row.control = library.create_popup(row, sections, LibVGASettings[key] or fallback, function(value)
+        library.update_choice_setting(key, value)
     end)
+    row.eye = library.create_eye(row, function(on)
+        previews[key] = on or nil
+        update_values()
+    end)
+    return row
+end
+
+local function write_arc_band(index)
+    library.update_choice_setting("arc_band", index == 2 and "on" or "off")
 end
 
 local function write_arc_shape(index)
@@ -355,7 +423,12 @@ local function create_arcs_page(page)
         library.create_choice_row(page, texts.values_shown, { texts.top, texts.bottom, texts.off }, read_place(PLACES, LibVGASettings.arc_values, "top"), function(index)
             library.update_choice_setting("arc_values", PLACES[index])
         end),        library.create_choice_row(page, texts.arc_shape, { texts.full_arc, texts.half_arc }, LibVGASettings.arc_shape == "half" and 2 or 1, write_arc_shape),
+        library.create_choice_row(page, texts.frame, { texts.off, texts.on }, LibVGASettings.arc_band == "on" and 2 or 1, write_arc_band),
     }
+end
+
+local function render_arcs_settings()
+    library.update_safely("arcs settings", library.render_settings, "arcs")
 end
 
 local function create_arcs()
@@ -366,6 +439,9 @@ local function create_arcs()
     arcs.right = create_side(1)
     arcs.right.key, arcs.right.default = "arc_right", "threat"
     library.create_place(arcs, "arcs", "CENTER", UIParent, 0, -read_draft(165))
+    for _, side in ipairs({ arcs.left, arcs.right }) do
+        side.corner = library.create_corner(arcs, false, render_arcs_settings)
+    end
     library.create_element("arcs", { title = library.texts.arcs, icon = "TabArcs", update = update_arcs, tab = create_arcs_page })
     write_checks()
     C_Timer.After(5, function() library.update_safely("arcs checks", write_checks) end)

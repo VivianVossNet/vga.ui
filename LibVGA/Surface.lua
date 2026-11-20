@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: LibVGA's rounded surfaces, drawn of a corner texture and three bands; notches, the inverse corners that round whatever lies beneath them; thin rings, a line with rounded corners and nothing inside, or bold ones whose corners round by twice their width ({K0413}); and the gold corner that opens an element's options. A cell's picture - an action key's, a bag's, a menu button's - fills the cell up to its edge's inner side, its square corners under the edge's rounding (read_cell_inset, update_cell_picture; K0536, K0544).
+-- Scope: LibVGA's rounded surfaces, drawn of a corner texture and three bands; notches, the inverse corners that round whatever lies beneath them; thin rings, a line with rounded corners and nothing inside, or bold ones whose corners round by twice their width ({K0413}); and the gold corner that opens an element's options. A cell's picture - an action key's, a bag's, a menu button's - fills the cell up to its edge's inner side, its square corners under the edge's rounding (read_cell_inset, update_cell_picture; K0536, K0544). Every inset, radius and thickness is laid on whole screen pixels in its frame's own scale (read_whole_pixels, the game's PixelUtil), so lines keep one width and the pieces of a surface meet without a seam (K0562).
 
--- {K0256} {K0267} {K0334} {K0346} {K0349} {K0413} {K0536} {K0544}
+-- {K0256} {K0267} {K0334} {K0346} {K0349} {K0413} {K0536} {K0544} {K0562}
 
 local library = LibVGA
 local CELL_GAP = 0
@@ -62,9 +62,16 @@ local function update_flat_foot(surface, inset, radius)
     pieces.MIDDLE:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -inset, inset)
 end
 
+function library.read_whole_pixels(units, region)
+    if not (PixelUtil and PixelUtil.GetNearestPixelSize and region and region.GetEffectiveScale) then return units end
+    local sign = units < 0 and -1 or 1
+    return sign * PixelUtil.GetNearestPixelSize(math.abs(units), region:GetEffectiveScale(), units ~= 0 and 1 or 0)
+end
+
 function library.update_surface(surface, inset, radius, top, bottom, alpha)
     local frame, pieces = surface.frame, surface.pieces
-    radius = math.max(radius, 1)
+    inset = library.read_whole_pixels(inset, frame)
+    radius = library.read_whole_pixels(math.max(radius, 1), frame)
     for _, corner in ipairs(CORNERS) do
         local point = corner[1]
         local piece = pieces[point]
@@ -158,7 +165,9 @@ function library.create_ring(frame, layer, level, around, bold)
 end
 
 function library.update_ring(ring, thickness, colour, alpha)
-    local frame, pieces, radius = ring.frame, ring.pieces, ring.ratio * thickness
+    local frame = ring.frame
+    thickness = library.read_whole_pixels(thickness, frame)
+    local pieces, radius = ring.pieces, ring.ratio * thickness
     for _, corner in ipairs(CORNERS) do
         local piece = pieces[corner[1]]
         piece:ClearAllPoints()

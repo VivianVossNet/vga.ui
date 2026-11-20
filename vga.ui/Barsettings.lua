@@ -120,19 +120,16 @@ local function write_count(index)
     update_bar_rows()
 end
 
-local END_KINDS = { "gryphon", "dragon", "wolf", "bear" }
-
-local function read_end_index(key)
-    for index, kind in ipairs(END_KINDS) do
-        if LibVGASettings[key] == kind then return index end
-    end
-    return 1
-end
+local END_KINDS = { "gryphon", "dragon", "wolf", "bear", "lion", "raptor", "knight" }
 
 local function create_end_row(texts, title, key)
-    return library.create_choice_row(page, title, { texts.gryphon, texts.dragon, texts.wolf, texts.bear }, read_end_index(key), function(index)
-        library.update_choice_setting(key, END_KINDS[index])
+    local items = {}
+    for index, kind in ipairs(END_KINDS) do items[index] = { kind, texts[kind] } end
+    local row = library.create_row(page, title)
+    row.control = library.create_popup(row, { { items = items } }, LibVGASettings[key] or "gryphon", function(value)
+        library.update_choice_setting(key, value)
     end)
+    return row
 end
 
 local function write_menu_icons(index)

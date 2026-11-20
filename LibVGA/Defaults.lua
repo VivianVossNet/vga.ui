@@ -11,6 +11,7 @@ local DEFAULTS = {
     arc_left = "resource",
     arc_right = "health",
     arc_shape = "full",
+    arc_band = "off",
     bags_place = { "BOTTOMRIGHT", -417, 332 },
     bar_end_left = "dragon",
     bar_end_right = "dragon",

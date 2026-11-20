@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: Blizzard's chat in the accepted draft's look (manual/view/vga-probe.html .chat, .tabs2, .msgs, .in): Blizzard's background, border, tab and input art cleared; vga.ui's widget laid beneath tabs, lines and input, its ground the frames' setting, the small gold corner; the tabs quiet, the chosen one gold with a gold line beneath; the lines in Geologica at the player's own size, spaced by three tenths of it; the lines at 12 pixels by default, set once, the player's own size kept after (K0510); the widget's left edge the chat's own, never a docked tab's, so a docked window - the combat log with its quick buttons too - lies wholly inside it; the input let into the ground, dark, with a fine line, as wide as the lines above it, its line turning gold and its ground a shade lighter while it is typed into, a gold caret blinking after the last letter typed; once, a default size after the draft (420 by 150 at a 13-pixel base), the player's own resizing kept after. Blizzard's chat itself - channels, links, history, input - is untouched.
+-- Scope: Blizzard's chat in the accepted draft's look (manual/view/vga-probe.html .chat, .tabs2, .msgs, .in): Blizzard's background, border, tab and input art cleared; vga.ui's widget laid beneath tabs, lines and input, its ground the frames' setting, the small gold corner; the tabs quiet, the chosen one gold with a gold line beneath, always at full strength - the game's fading of the tabs while the mouse is away set to none (K0558) -; the lines in Geologica at the player's own size, spaced by three tenths of it; the lines at 12 pixels by default, set once, the player's own size kept after (K0510); the widget's left edge the chat's own, never a docked tab's, so a docked window - the combat log with its quick buttons too - lies wholly inside it; the input let into the ground, dark, with a fine line, as wide as the lines above it, its line turning gold and its ground a shade lighter while it is typed into, a gold caret blinking after the last letter typed; once, a default size after the draft (420 by 150 at a 13-pixel base), the player's own resizing kept after. Blizzard's chat itself - channels, links, history, input - is untouched.
 
--- {K0264} {K0266} {K0358} {K0359} {K0362} {K0363} {K0510}
+-- {K0264} {K0266} {K0358} {K0359} {K0362} {K0363} {K0510} {K0558}
 
 local library = LibVGA
 local colours = library.colours
@@ -15,6 +15,7 @@ local TAB_QUIET = { 0.604, 0.588, 0.549 }
 local TAB_CHOSEN = { 0.945, 0.812, 0.431 }
 local LINE_SPACING = 0.3
 local FONT_SIZE = 12
+local TAB_FADES = { "CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA", "CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA", "CHAT_FRAME_TAB_ALERTING_NOMOUSE_ALPHA" }
 local skins = {}
 
 local function update_cleared(region)
@@ -99,6 +100,7 @@ end
 local function update_tab(chat, skin)
     local tab = _G[chat:GetName() .. "Tab"]
     if not tab then return end
+    tab:SetAlpha(1)
     local text = tab:GetFontString() or tab.Text
     local chosen = SELECTED_CHAT_FRAME == chat or (GENERAL_CHAT_DOCK and FCFDock_GetSelectedWindow and FCFDock_GetSelectedWindow(GENERAL_CHAT_DOCK) == chat)
     local colour = chosen and TAB_CHOSEN or TAB_QUIET
@@ -139,6 +141,10 @@ local function update_chat(chat)
     update_tab(chat, skin)
 end
 
+local function update_tabs_kept()
+    for _, name in ipairs(TAB_FADES) do _G[name] = 1 end
+end
+
 local function update_chats()
     for index = 1, NUM_CHAT_WINDOWS or 0 do
         local chat = _G["ChatFrame" .. index]
@@ -173,6 +179,7 @@ events:RegisterEvent("UPDATE_CHAT_WINDOWS")
 events:RegisterEvent("UPDATE_FLOATING_CHAT_WINDOWS")
 events:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_LOGIN" then
+        update_tabs_kept()
         library.create_element("chat", { update = update_chats })
         library.update_safely("chat size", update_default_size)
         library.update_safely("chat font", update_default_font)

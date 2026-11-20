@@ -1,10 +1,13 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: LibVGA's segmented choice, the chosen part in gold; one size for every part, the weight alone changing, every part as wide as the widest in its bold state, or as a given width allows, so a choice moves nothing; a part may show an icon in place of its word, the word then its tooltip; the parts joined over a black ground, its outer corners rounded, as vga-scale.html and vga-probe.html's .vt-seg draw it.
+-- Scope: LibVGA's segmented choice, the chosen part in gold; one size for every part, the weight alone changing, every part as wide as the widest in its bold state, or as a given width allows, so a choice moves nothing; a part may show an icon in place of its word, the word then its tooltip; the parts joined over a black ground, its outer corners rounded, as vga-scale.html and vga-probe.html's .vt-seg draw it. A choice of off and on is a switch instead, in the way of macOS: a rounded track, gold while on, a light knob at its end (K0565).
 
--- {K0256} {K0330} {K0334} {K0337} {K0409}
+-- {K0256} {K0330} {K0334} {K0337} {K0409} {K0565}
 
 local library = LibVGA
+local SWITCH_RATIO = 1.65
+local update_switch_look
+local SWITCH_OFF = { 0.173, 0.184, 0.208 }
 local colours = library.colours
 
 local function render_tip(button)
@@ -68,6 +71,11 @@ function library.read_choice_width(choice)
 end
 
 function library.update_choice(choice, wanted)
+    if choice.switch then
+        if choice.chosen then choice.on = choice.chosen == choice.on_index end
+        update_switch_look(choice)
+        return
+    end
     choice.wanted = wanted or choice.wanted
     wanted = choice.wanted
     local height, count = library.read_size(2), #choice.buttons
@@ -94,4 +102,38 @@ function library.update_choice(choice, wanted)
     local radius = library.read_size(-6)
     library.update_surface(choice.ground, -1, radius + 1, { 0, 0, 0 }, { 0, 0, 0 })
     library.update_notches(choice.notches, choice, radius, { 0, 0, 0 })
+end
+
+function update_switch_look(switch)
+    local height = library.read_size(1)
+    local width, knob = math.floor(height * SWITCH_RATIO + 0.5), height - 4
+    switch:SetSize(width, height)
+    local track = switch.on and colours.gold or SWITCH_OFF
+    library.update_surface(switch.track, 0, height / 2, track, track)
+    switch.knob:SetSize(knob, knob)
+    switch.knob:ClearAllPoints()
+    switch.knob:SetPoint(switch.on and "RIGHT" or "LEFT", switch, switch.on and "RIGHT" or "LEFT", switch.on and -2 or 2, 0)
+    library.update_surface(switch.knob.face, 0, knob / 2, colours.ink, colours.ink)
+end
+
+local function render_switched(switch)
+    switch.on = not switch.on
+    if switch.on_index then switch.chosen = switch.on and switch.on_index or 3 - switch.on_index end
+    update_switch_look(switch)
+    switch.on_change(switch.on)
+end
+
+function library.create_switch(parent, on, on_change)
+    local switch = CreateFrame("Button", nil, parent)
+    switch.switch, switch.on, switch.on_change = true, on and true or false, on_change
+    switch.track = library.create_surface(switch, "BACKGROUND", 0)
+    switch.knob = CreateFrame("Frame", nil, switch)
+    switch.knob.face = library.create_surface(switch.knob, "ARTWORK", 0)
+    switch:SetScript("OnClick", render_switched)
+    update_switch_look(switch)
+    return switch
+end
+
+function library.update_switch(switch)
+    update_switch_look(switch)
 end

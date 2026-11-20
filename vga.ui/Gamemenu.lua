@@ -18,7 +18,7 @@ local PICTURE_SHARE = 0.68
 local PICTURE_ASPECT = 0.74
 local MENU = {
     { "CharacterMicroButton", "MenuCharacter" }, { "ProfessionMicroButton", "FilterHammer" }, { "SpellbookMicroButton", "MenuBook" },
-    { "TalentMicroButton", "MenuSword" }, { "LegacyMicroButton", "MenuShield" }, { "QuestLogMicroButton", "MenuQuest" },
+    { "TalentMicroButton", "TabQuests" }, { "LegacyMicroButton", "MenuShield" }, { "QuestLogMicroButton", "MenuQuest" },
     { "GuildMicroButton", "MenuBanner" }, { "LFDMicroButton", "MenuEye" }, { "CollectionsMicroButton", "MenuShoe" },
     { "MainMenuMicroButton", "MenuCog" }, { "HelpMicroButton", "FilterQuest" },
 }
@@ -75,7 +75,7 @@ local function read_own_icon(button)
 end
 
 local function update_icon(holder, button, own)
-    local icon = own and read_own_icon(button)
+    local icon = own and read_own_icon(button) or nil
     holder.cover.icon:SetShown(icon ~= nil)
     button:SetAlpha(icon and 0 or 1)
     if not icon then return end

@@ -1,13 +1,20 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's one settings dialog as the accepted draft orders it (manual/view/vga-settings.html), standing high on the screen, its top fixed, as tall as the tab shown and growing or shrinking downward with a soft, eased animation, as wide as its widest tab: a tab with picture and word per thing the player sees - Allgemein, Einheiten, Plaketten, then each element's own, Leisten, Erfahrung, Quests -, at most seven rows a tab; Allgemein ending in the red »Alles zurücksetzen …«, which asks once; the last tab, Anordnen, reached from everywhere, with the alignment - free or on a grid of eight or of sixteen pixels - and the gold »Anordnen …«, which closes the dialog and shows the handles; every choice working at once - a new face measured again a moment later, when the game has loaded its file, so that every width follows it; the one menu there is - a widget's gold corner opens it on the widget's tab, the widget's own settings in the group »Widgets« at the tab's foot; and the command /vga.
+-- Scope: vga.ui's one settings dialog as the accepted draft orders it (manual/view/vga-settings.html), standing high on the screen, its top fixed, as tall as the tab shown and growing or shrinking downward with a soft, eased animation, as wide as its sidebar and its widest page: at the left a sidebar in the way of the macOS System Settings (Sidebar.lua, K0565) - Darstellung: Allgemein; Im Kampf: Einheiten, Plaketten, Bögen; Leisten: Aktionsleisten, Erfahrung; Welt: Quests, Minimap, Taschen; set apart Anordnen and Profile -, at the right the chosen page under its title, at most seven rows a page; Allgemein ending in the red »Alles zurücksetzen …«, which asks once; the last tab, Anordnen, reached from everywhere, with the alignment - free or on a grid of eight or of sixteen pixels - and the gold »Anordnen …«, which closes the dialog and shows the handles; every choice working at once - a new face measured again a moment later, when the game has loaded its file, so that every width follows it; the one menu there is - a widget's gold corner opens it on the widget's tab, the widget's own settings in the group »Widgets« at the tab's foot; and the command /vga.
 
--- {K0268} {K0311} {K0316} {K0324} {K0330} {K0337} {K0383} {K0384} {K0430}
+-- {K0268} {K0311} {K0316} {K0324} {K0330} {K0337} {K0383} {K0384} {K0430} {K0565}
 
 local library = LibVGA
 
 local settings
 local ORDER = { "mainbar", "experience", "arcs", "quests", "bags", "map" }
+local GROUPS = {
+    { title = "appearance", keys = { "general" } },
+    { title = "in_fight", keys = { "units", "plates", "arcs" } },
+    { title = "bars", keys = { "mainbar", "experience" }, names = { mainbar = "action_bars" } },
+    { title = "world", keys = { "quests", "map", "bags" } },
+    { keys = { "arrange", "profiles" } },
+}
 local GROW = 0.25
 local FROM_TOP = 0.12
 local FONT_LOADED = 0.3
@@ -33,6 +40,7 @@ end
 
 local function update_tab(name)
     settings.chosen = name
+    settings.heading:SetText(settings.titles[name] or "")
     for key, page in pairs(settings.pages) do
         page:SetShown(key == name)
     end
@@ -46,8 +54,22 @@ local function update_top(dialog)
     dialog:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
 end
 
+local function read_switch_order(labels)
+    local texts = library.texts
+    if #labels ~= 2 then return nil end
+    if labels[1] == texts.off and labels[2] == texts.on then return 2 end
+    if labels[1] == texts.on and labels[2] == texts.off then return 1 end
+    return nil
+end
+
 function library.create_choice_row(page, label, labels, chosen, on_choose)
     local row = library.create_row(page, label)
+    local on_index = read_switch_order(labels)
+    if on_index then
+        row.control = library.create_switch(row, chosen == on_index, function(on) on_choose(on and on_index or 3 - on_index) end)
+        row.control.on_index = on_index
+        return row
+    end
     row.control = library.create_choice(row, labels, chosen, on_choose)
     return row
 end
@@ -161,21 +183,37 @@ local function read_pages()
     return pages
 end
 
+local function read_groups(pages)
+    local texts, by_key, groups = library.texts, {}, {}
+    for _, entry in ipairs(pages) do by_key[entry.key] = entry end
+    for _, group in ipairs(GROUPS) do
+        local made = { title = group.title and texts[group.title], entries = {} }
+        for _, key in ipairs(group.keys) do
+            local entry = by_key[key]
+            if entry then made.entries[#made.entries + 1] = { key = key, icon = entry.icon, title = group.names and texts[group.names[key]] or entry.title } end
+        end
+        if #made.entries > 0 then groups[#groups + 1] = made end
+    end
+    return groups
+end
+
 local function create_settings()
     settings = library.create_dialog("LibVGASettingsDialog", "vga.ui · " .. library.texts.settings)
+    settings:HookScript("OnHide", library.update_eyes_closed)
     settings:SetClipsChildren(true)
     settings:SetScript("OnDragStop", update_top)
-    settings.pages, settings.order = {}, {}
+    settings.pages, settings.order, settings.titles = {}, {}, {}
     local pages = read_pages()
     for index, entry in ipairs(pages) do
         local page = CreateFrame("Frame", nil, settings.body)
         entry.build(page)
         settings.pages[entry.key] = page
         settings.order[index] = entry.key
+        settings.titles[entry.key] = entry.title
     end
-    settings.tabs = library.create_tabs(settings.body, pages, function(index)
-        update_tab(settings.order[index])
-    end)
+    settings.titles.mainbar = library.texts.action_bars
+    settings.heading = library.create_text(settings.body, "title", library.colours.ink)
+    settings.sidebar = library.create_sidebar(settings.body, read_groups(pages), update_tab)
     library.create_element("settings", { update = library.update_settings })
     update_tab("general")
 end
@@ -200,28 +238,33 @@ end
 function library.update_settings()
     if not settings then return end
     library.update_dialog(settings)
-    local band = library.read_tabs_height()
+    local side, gap = library.read_sidebar_width(settings.sidebar), library.read_size(0)
+    local side_height = library.update_sidebar(settings.sidebar, settings.chosen)
+    settings.heading:SetFontObject(library.read_font("title"))
+    local band = math.ceil(settings.heading:GetStringHeight()) + 2 * library.read_size(-2)
     local widest, columns = 0, {}
     for _, key in ipairs(settings.order) do
         local page = settings.pages[key]
         columns[key] = library.update_row_controls(page.rows or {})
-        page.wanted = library.read_rows_height(page.rows or {}) + read_foot_height(page)
+        page.wanted = math.max(library.read_rows_height(page.rows or {}) + read_foot_height(page) + band, side_height)
         widest = math.max(widest, library.read_rows_width(page.rows or {}, columns[key]))
     end
     local head, inner = library.read_size(4), library.read_size(-4)
-    local width = math.max(widest, library.read_tabs_width(settings.tabs), settings.title:GetStringWidth() + library.read_size(6)) + 2 * inner
-    settings.frame_height = head + 1 + band + 2 * inner
+    local width = math.max(side + gap + widest, settings.title:GetStringWidth() + library.read_size(6)) + 2 * inner
+    settings.frame_height = head + 1 + 2 * inner
     settings:SetWidth(width)
-    settings.tabs:ClearAllPoints()
-    settings.tabs:SetPoint("TOPLEFT", settings.body, "TOPLEFT")
-    settings.tabs:SetSize(width - 2 * inner, band)
-    library.update_tabs(settings.tabs)
+    settings.sidebar:ClearAllPoints()
+    settings.sidebar:SetPoint("TOPLEFT", settings.body, "TOPLEFT")
+    settings.sidebar:SetPoint("BOTTOMLEFT", settings.body, "BOTTOMLEFT")
+    settings.sidebar:SetWidth(side)
+    settings.heading:ClearAllPoints()
+    settings.heading:SetPoint("TOPLEFT", settings.body, "TOPLEFT", side + gap, -library.read_size(-2))
     for _, key in ipairs(settings.order) do
         local page = settings.pages[key]
         page:ClearAllPoints()
-        page:SetPoint("TOPLEFT", settings.body, "TOPLEFT", 0, -band)
+        page:SetPoint("TOPLEFT", settings.body, "TOPLEFT", side + gap, -band)
         page:SetPoint("BOTTOMRIGHT", settings.body, "BOTTOMRIGHT")
-        library.update_rows(page.rows or {}, page, 0, columns[key], width - 2 * inner)
+        library.update_rows(page.rows or {}, page, 0, columns[key], width - 2 * inner - side - gap)
         update_foot(page)
     end
     update_height()
@@ -241,10 +284,9 @@ function library.render_settings(key)
         library.update_settings()
     end
     settings:Show()
-    for index, name in ipairs(settings.order) do
+    for _, name in ipairs(settings.order) do
         if name == (key or settings.chosen) then
-            settings.tabs.chosen = index
-            library.update_tabs(settings.tabs)
+            library.update_sidebar(settings.sidebar, name)
             update_tab(name)
         end
     end

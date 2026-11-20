@@ -1,21 +1,18 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's own action bars as manual/view/vga-mainbar.html draws them, each key edged as the bags' slots - three pixels with gently rounded corners in the slot's grey, laid over the icon: eight bars of twelve protected keys of our own, on Blizzard's own pages - the main bar on the player's action slots, turning its page with stance, form, vehicle and override as Blizzard's does - a stance's or stealth's page only while the player's own page is the first, so sub-bar B can be chosen in any stance (K0534) -, the second on page 6, the third on 5, the fourth and fifth on 3 and 4, Blizzard's right bars, the sixth to eighth on 13 to 15 -, bound to the player's own keys, each shown or hidden as the settings say, bars 4 to 8 at first as the player had them in Blizzard's settings; two rows by default, the second and third bar side by side above the main bar, the second at the left, the upper row always centred on the screen's middle as the lower row is, whatever the lower row's parts weigh (K0535), or all in one row, as the settings' »Leisten« page says, the bottom row centred on the screen whole; in one row two or three bars as the settings say, three by default, in two rows always three; the whole element - bars, game menu, bag bar and gryphons - scaled down as far as needed for the gryphons' outer ends to fit the screen's width, the widget itself never scaled but drawn around them at whole pixels, so its pieces show no seams; the game menu and the bag bar beside them; behind them one widget in the tooltip's look with its gold corner, the experience bar of Experience.lua between the rows; the keys dressed as the draft's .key; the game's own gryphons drawn at both ends. Bars 4 to 8 always stand free, each in a widget of its own. In the third form, »lose«, the gryphons and the shared widget go: each bar, the game menu, the bag bar and the experience bar stands in a widget of its own, with its own ground and gold corner, moved in the edit mode, at first scattered over the screen so that arranging them is plainly the next step; each free bar stacks its keys 1, 2, 3, 4, 6 or 12 to a row and each area is drawn small, normal or large - 80, 100 or 125 per cent - as the »Leisten« page says, which Barsettings.lua draws. Blizzard's eight bars and experience bars are put away in a hidden frame and put back there whenever Blizzard's managed layout takes them out again; nothing protected is moved in a fight. The game's range dot, which an unbound key shows in its key's corner, is drawn in the game's Arial Narrow, since our faces lack the glyph; the bars are laid anew when the game's Edit Mode layouts arrive, late on a character's first login.
+-- Scope: vga.ui's own action bars as manual/view/vga-mainbar.html draws them, each key edged as the bags' slots - three pixels with gently rounded corners in the slot's grey, laid over the icon: eight bars of twelve protected keys of our own, on Blizzard's own pages - the main bar on the player's action slots, turning its page with stance, form, vehicle and override as Blizzard's does - a stance's or stealth's page only while the player's own page is the first, so sub-bar B can be chosen in any stance (K0534) -, the second on page 6, the third on 5, the fourth and fifth on 3 and 4, Blizzard's right bars, the sixth to eighth on 13 to 15 -, bound to the player's own keys, each shown or hidden as the settings say, bars 4 to 8 at first as the player had them in Blizzard's settings; two rows by default, the second and third bar side by side above the main bar, the second at the left, the upper row always centred on the screen's middle as the lower row is, whatever the lower row's parts weigh (K0535), or all in one row, as the settings' »Leisten« page says, the bottom row centred on the screen whole; in one row two or three bars as the settings say, three by default, in two rows always three; the whole element - bars, game menu, bag bar and gryphons - scaled down as far as needed for the gryphons' outer ends to fit the screen's width, in steps that keep a key whole screen pixels wide (K0562), the widget itself never scaled but drawn around them at whole pixels, so its pieces show no seams; the game menu and the bag bar beside them; behind them one widget in the tooltip's look with its gold corner, the experience bar of Experience.lua between the rows; the keys dressed as the draft's .key; the game's own gryphons drawn at both ends, each end figure - the gryphon, dragon, wolf or bear - backed by its own shape three times over in near black, so nothing shows through where its picture is faint (K0561). Dragon, wolf, bear, lion, raptor and kneeling knight are painted after the gryphon - hewn statues in its dark brown, its light and its soft outline, their seam fading outward - and stand in exactly its box, as wide and high, overlapping the bar as it does (K0568, K0569). Bars 4 to 8 always stand free, each in a widget of its own. In the third form, »lose«, the gryphons and the shared widget go: each bar, the game menu, the bag bar and the experience bar stands in a widget of its own, with its own ground and gold corner, moved in the edit mode, at first scattered over the screen so that arranging them is plainly the next step; each free bar stacks its keys 1, 2, 3, 4, 6 or 12 to a row and each area is drawn small, normal or large - 80, 100 or 125 per cent - as the »Leisten« page says, which Barsettings.lua draws. Blizzard's eight bars and experience bars are put away in a hidden frame and put back there whenever Blizzard's managed layout takes them out again; nothing protected is moved in a fight. The game's range dot, which an unbound key shows in its key's corner, is drawn in the game's Arial Narrow, since our faces lack the glyph; the bars are laid anew when the game's Edit Mode layouts arrive, late on a character's first login.
 
--- {K0375} {K0376} {K0377} {K0380} {K0382} {K0384} {K0385} {K0419} {K0482} {K0503} {K0506}
+-- {K0375} {K0376} {K0377} {K0380} {K0382} {K0384} {K0385} {K0419} {K0482} {K0503} {K0506} {K0561} {K0562} {K0568} {K0573}
 
 local _, vga = ...
 local library = LibVGA
 local DRAFT_BASE = 13
 local KEYS = 12
-local END_FIGURES = {
-    dragon = { file = "EndDragon", width = 89, height = 123, overlap = 20 },
-    wolf = { file = "EndWolf", width = 93, height = 128, overlap = 26 },
-    bear = { file = "EndBear", width = 107, height = 128, overlap = 26 },
-}
-local END_CANVAS = 128
-local END_DRAFT = 105
-local END_FOOT = 15
+local BACK_LAYERS = 3
+local BACKING = { 0.05, 0.05, 0.06 }
+local END_FIGURES = { dragon = "EndDragon", wolf = "EndWolf", bear = "EndBear", lion = "EndLion", raptor = "EndRaptor", knight = "EndKnight" }
+local END_SHARE = 207 / 256
+local END_OUTWARD = { knight = 16 }
 local BARS = {
     { name = "VGAActionBar", page = 1, command = "ACTIONBUTTON" },
     { name = "VGASecondBar", page = 6, command = "MULTIACTIONBAR1BUTTON", blizzard = "MultiBarBottomLeft" },
@@ -282,24 +279,32 @@ local function update_experience()
     vga.update_experience(block)
 end
 
+local function update_backs(holder, file, atlas, top, right)
+    for _, back in ipairs(holder.backs) do
+        if atlas then back:SetAtlas(atlas) else back:SetTexture(file) end
+        back:SetTexCoord(0, right or 1, top or 0, 1)
+        back:SetVertexColor(BACKING[1], BACKING[2], BACKING[3], 1)
+    end
+end
+
+local function read_end_overlap(side)
+    return read_draft(34 - (END_OUTWARD[LibVGASettings["bar_end_" .. side] or "gryphon"] or 0))
+end
+
 local function update_end_art(holder, side)
-    local figure = END_FIGURES[LibVGASettings["bar_end_" .. side] or "gryphon"]
-    holder.shade:SetShown(figure ~= nil)
+    local file = END_FIGURES[LibVGASettings["bar_end_" .. side] or "gryphon"]
     holder.foot = 0
-    if not figure then
+    if file then
+        local name = library.media .. file .. (side == "left" and "Left" or "Right")
+        holder.art:SetTexture(name)
+        holder.art:SetTexCoord(0, END_SHARE, 0, 1)
+        update_backs(holder, name, nil, 0, END_SHARE)
+    else
         holder.art:SetAtlas("ui-hud-actionbar-gryphon-" .. side)
         holder.art:SetTexCoord(0, 1, 0, 1)
-        return read_draft(34), math.floor(read_draft(95) * 154 / 95 + 0.5), read_draft(95)
+        update_backs(holder, nil, "ui-hud-actionbar-gryphon-" .. side)
     end
-    local name = library.media .. figure.file .. (side == "left" and "Left" or "Right")
-    local scale = read_draft(95) / END_DRAFT
-    local top = (END_CANVAS - figure.height) / END_CANVAS
-    for _, layer in ipairs({ holder.art, holder.shade }) do
-        layer:SetTexture(layer == holder.art and name or name .. "Shade")
-        layer:SetTexCoord(0, figure.width / END_CANVAS, top, 1)
-    end
-    holder.foot = math.floor(END_FOOT * scale + 0.5)
-    return math.floor(figure.overlap * scale + 0.5), math.floor(figure.width * scale + 0.5), math.floor(figure.height * scale + 0.5)
+    return read_end_overlap(side), math.floor(read_draft(95) * 154 / 95 + 0.5), read_draft(95)
 end
 
 local function update_gryphons()
@@ -322,12 +327,20 @@ local function read_natural_width(two)
     local count = two and 1 or (read_three() and 3 or 2)
     local bottom = micro + gap + count * bar + vga.read_page_switch_reach() + (count - 1) * gap + gap + bags
     local top = two and (read_three() and 2 * bar + gap or bar) or 0
-    local gryphon = math.floor(read_draft(95) * 154 / 95 + 0.5) - read_draft(34)
-    return math.max(bottom, top) + 2 * read_draft(8) + 2 * gryphon
+    local gryphon = 2 * math.floor(read_draft(95) * 154 / 95 + 0.5) - read_end_overlap("left") - read_end_overlap("right")
+    return math.max(bottom, top) + 2 * read_draft(8) + gryphon
+end
+
+local function read_whole_fit(fit)
+    if not (GetPhysicalScreenSize and PixelUtil and PixelUtil.GetPixelToUIUnitFactor) then return fit end
+    local key = read_draft(38)
+    local pixels = key * fit * UIParent:GetEffectiveScale() / PixelUtil.GetPixelToUIUnitFactor()
+    if pixels < 1 then return fit end
+    return fit * math.floor(pixels) / pixels
 end
 
 local function update_fit()
-    local fit = math.min(1, UIParent:GetWidth() / read_natural_width(not read_one_row()))
+    local fit = read_whole_fit(math.min(1, UIParent:GetWidth() / read_natural_width(not read_one_row())))
     for _, frame in ipairs({ mainbar.first_bar, mainbar.second_bar, mainbar.third_bar, mainbar.gryphons.left, mainbar.gryphons.right }) do
         frame:SetScale(fit)
     end
@@ -441,8 +454,13 @@ local function create_gryphons()
         local holder = CreateFrame("Frame", nil, UIParent)
         holder:SetFrameStrata("MEDIUM")
         holder:SetFrameLevel(100)
-        holder.shade = holder:CreateTexture(nil, "ARTWORK")
-        holder.shade:SetAllPoints()
+        holder.backs = {}
+        for layer = 1, BACK_LAYERS do
+            local back = holder:CreateTexture(nil, "ARTWORK", nil, layer)
+            back:SetAllPoints()
+            back:SetVertexColor(BACKING[1], BACKING[2], BACKING[3], 1)
+            holder.backs[layer] = back
+        end
         holder.art = holder:CreateTexture(nil, "OVERLAY")
         holder.art:SetAllPoints()
         holder.art:SetAtlas("ui-hud-actionbar-gryphon-" .. side)

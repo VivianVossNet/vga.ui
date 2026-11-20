@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The navigation arrow centred between the player frame and the target frame: three gold chevrons, the foremost strongest and each behind it fainter, laid on the ground as if they lay on the way, each tilted back on its own, with room between them, the farther a little smaller - turned towards the nearest open quest's target as the player sees it - the quest set as the game's tracked one, so the game's own navigation tells where its target stands on the screen, and the arrow points from the screen's middle there, turning with the camera however it is turned, behind the camera pointing back; where the game gives no screen place, by the character's facing - and tilted back (K0545) -, its distance beneath it; shown whenever the tracker has such a target, in a fight too, gone without one.
+-- Scope: The navigation arrow centred between the player frame and the target frame: three gold chevrons, the foremost strongest and each behind it fainter, laid on the ground as if they lay on the way, each tilted back on its own, with room between them, the farther a little smaller - turned towards the nearest open quest's target as the player sees it - the quest set as the game's tracked one, so the game's own navigation tells where its target stands on the screen, and the arrow points from the screen's middle there, turning with the camera however it is turned, behind the camera pointing back; where the game knows no place for the quest, a map waypoint of the game's is set on the arrow's target and tracked instead, so its place on the screen is known too (K0570); only where neither gives one, by the character's facing - and tilted back (K0545) -, its distance beneath it; shown whenever the tracker has such a target, in a fight too, gone without one.
 
--- {K0370} {K0372} {K0398} {K0399} {K0545}
+-- {K0370} {K0372} {K0398} {K0399} {K0545} {K0570}
 
 local _, vga = ...
 local library = LibVGA
@@ -73,15 +73,48 @@ local function update_place()
     return true
 end
 
+local waypoint_set, navigation_way
+
 local function update_tracked(aim)
     if not (aim.id and C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID) then return end
     if C_SuperTrack.GetSuperTrackedQuestID() ~= aim.id then C_SuperTrack.SetSuperTrackedQuestID(aim.id) end
 end
 
+local function check_screen_place()
+    return C_Navigation and C_Navigation.GetFrame and C_Navigation.GetFrame() and C_Navigation.HasValidScreenPosition and C_Navigation.HasValidScreenPosition()
+end
+
+local function update_waypoint(aim)
+    local map = C_Map.GetBestMapForUnit("player")
+    if not (map and aim.point and C_Map.SetUserWaypoint and UiMapPoint and C_SuperTrack.SetSuperTrackedUserWaypoint) then return end
+    local wanted = map .. ":" .. aim.point[1] .. ":" .. aim.point[2]
+    if waypoint_set ~= wanted then
+        C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(map, aim.point[1], aim.point[2]))
+        waypoint_set = wanted
+    end
+    if not (C_SuperTrack.IsSuperTrackingUserWaypoint and C_SuperTrack.IsSuperTrackingUserWaypoint()) then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
+end
+
+local function write_way(way)
+    if navigation_way == way then return end
+    navigation_way = way
+    LibVGASettings.measures = LibVGASettings.measures or {}
+    LibVGASettings.measures.navigation = way
+end
+
 function vga.read_screen_heading(aim)
     update_tracked(aim)
-    local marker = C_Navigation and C_Navigation.GetFrame and C_Navigation.GetFrame()
-    if not (marker and C_Navigation.HasValidScreenPosition and C_Navigation.HasValidScreenPosition()) then return nil end
+    local way = "quest"
+    if not check_screen_place() then
+        update_waypoint(aim)
+        way = "waypoint"
+    end
+    if not check_screen_place() then
+        write_way("none")
+        return nil
+    end
+    write_way(way)
+    local marker = C_Navigation.GetFrame()
     local marker_x, marker_y = marker:GetCenter()
     local middle_x, middle_y = WorldFrame:GetCenter()
     if not (marker_x and middle_x) then return nil end

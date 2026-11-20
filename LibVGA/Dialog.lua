@@ -1,10 +1,12 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: LibVGA's dialog as the accepted drafts draw it (manual/view/vga-scale.html .dlg, vga-template.css .vt): the metal frame, the head with the mark, the gold title and the close button, further buttons of the same make with an icon to its left where a dialog asks for them, its rows divided by hairlines; always free to move, its ground down to a floor.
+-- Scope: LibVGA's dialog as the accepted drafts draw it (manual/view/vga-scale.html .dlg, vga-template.css .vt): the metal frame, the head with the mark, the gold title and the close button, further buttons of the same make with an icon to its left where a dialog asks for them, its rows divided by hairlines; always free to move, its ground down to a floor. Rows that stand together outside a fieldset stand on one rounded, faintly lighter card, in the way of the macOS System Settings (K0565).
 
--- {K0256} {K0296} {K0299} {K0324} {K0330} {K0337} {K0415}
+-- {K0256} {K0296} {K0299} {K0324} {K0330} {K0337} {K0415} {K0565}
 
 local library = LibVGA
+local CARD = { 1, 1, 1 }
+local CARD_ALPHA = 0.04
 local colours = library.colours
 local BLACK = { 0, 0, 0 }
 local CLOSE_TOP = { 0.227, 0.239, 0.267 }
@@ -174,6 +176,8 @@ function library.read_row_height(row)
 end
 
 local function read_control_width(control)
+    if control.switch then return 0 end
+    if control.popup then return library.read_popup_width(control) end
     if control.stops then return library.read_slider_width() end
     if control.buttons then return library.read_choice_width(control) end
     if control.pictures then return library.read_pictures_width(control) end
@@ -195,6 +199,8 @@ function library.update_row_controls(rows)
         if control and control.stops then library.update_slider(control, column) end
         if control and control.buttons then library.update_choice(control, column) end
         if control and control.pictures then library.update_pictures(control) end
+        if control and control.switch then library.update_switch(control) end
+        if control and control.popup then library.update_popup(control) end
     end
     return column
 end
@@ -279,6 +285,11 @@ local function update_row_control(row, parent, pad, inset, column, width)
         else
             control:SetPoint("RIGHT", row, "RIGHT", -pad, 0)
         end
+        if row.eye then
+            library.update_eye_layout(row.eye)
+            row.eye:ClearAllPoints()
+            row.eye:SetPoint("RIGHT", control, "LEFT", -pad / 2, 0)
+        end
     end
 end
 
@@ -289,11 +300,30 @@ local function update_row_label(row, pad, inset)
     row.label:SetPoint("LEFT", row, "LEFT", row.kind == "heading" and inset + pad - math.max(3, library.read_size(-6)) or pad, 0)
 end
 
+local function update_cards(parent, runs)
+    parent.cards = parent.cards or {}
+    for index, run in ipairs(runs) do
+        local card = parent.cards[index]
+        if not card then
+            card = CreateFrame("Frame", nil, parent)
+            card:SetFrameLevel(math.max(parent:GetFrameLevel() - 1, 0))
+            card.face = library.create_surface(card, "BACKGROUND", -8)
+            parent.cards[index] = card
+        end
+        card:ClearAllPoints()
+        card:SetPoint("TOPLEFT", run[1], "TOPLEFT")
+        card:SetPoint("BOTTOMRIGHT", run[2], "BOTTOMRIGHT")
+        card:Show()
+        library.update_surface(card.face, 0, library.read_size(-4), CARD, CARD, CARD_ALPHA)
+    end
+    for index = #runs + 1, #parent.cards do parent.cards[index]:Hide() end
+end
+
 function library.update_rows(rows, parent, top, column, width)
     local pad, below = library.read_size(0), top
     local half = math.floor(pad / 2 + 0.5)
     rows = library.read_shown_rows(rows)
-    local group_end = 0
+    local group_end, runs = 0, {}
     for index, row in ipairs(rows) do
         local height = library.read_row_height(row)
         local inset = (index <= group_end and row.kind ~= "heading") and half or 0
@@ -314,6 +344,10 @@ function library.update_rows(rows, parent, top, column, width)
         row.line:SetHeight(1)
         row.line:SetShown(index < #rows and index ~= group_end and row.kind ~= "heading")
         if index == group_end then below = below + read_group_gap() end
+        local plain = row.kind ~= "heading" and index > group_end
+        local run = runs[#runs]
+        if plain and run and run.open then run[2] = row elseif plain then runs[#runs + 1] = { row, row, open = true } elseif run then run.open = false end
     end
+    update_cards(parent, runs)
     return below
 end
