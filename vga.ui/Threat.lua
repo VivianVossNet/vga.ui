@@ -1,74 +1,90 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The threat the player draws from the target, as five bars rising like a wifi sign above the target frame's top right: each bar appearing whole once the threat passes the start of its fifth - like a wifi sign, no bar half filled -, set by the game from the value even where it is secret, each bar's range a hundredth wide; grey, white, gold, bronze, red. Shown only while the player stands on the target's threat list.
+-- Scope: The threat the player draws from the target, as five flat pills under the target frame's power bar, halfway between the bar and the frame's lower edge, as the rogue's combo points stand on the player frame (Combo.lua): each pill lit whole once the threat passes the start of its fifth, in its step's colour - grey, white, gold, bronze, red -, an open pill dark, each in a black line; set by the game from the value even where it is secret, each pill's range a hundredth wide. The row's room is kept on the target frame, so nothing moves; the pills show only while the player stands on the target's threat list.
 
--- {K0344} {K0356} {K0357} {K0366}
+-- {K0344} {K0356} {K0357} {K0366} {K0480}
 
 local library = LibVGA
 local STEP = 0.01
-local meter
+local POINTS = 5
+local OPEN = { 0.2, 0.21, 0.24 }
+local EDGE = { 0, 0, 0 }
+local row
 
-local function create_meter()
-    meter = CreateFrame("Frame", nil, UIParent)
-    meter.bars = {}
-    for index, top in ipairs(library.colours.steps) do
-        local colour = { top, { top[1] * 0.62, top[2] * 0.62, top[3] * 0.62 } }
-        local bar = CreateFrame("StatusBar", nil, meter)
-        bar:SetOrientation("VERTICAL")
-        bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-        bar:GetStatusBarTexture():SetGradient("VERTICAL", library.create_colour(colour[2]), library.create_colour(colour[1]))
-        bar:SetMinMaxValues(20 * (index - 1), 20 * (index - 1) + STEP)
-        bar:SetValue(0)
-        bar.line = bar:CreateTexture(nil, "BACKGROUND", nil, -1)
-        bar.line:SetPoint("TOPLEFT", -1, 1)
-        bar.line:SetPoint("BOTTOMRIGHT", 1, -1)
-        bar.line:SetColorTexture(0, 0, 0, 1)
-        bar.back = bar:CreateTexture(nil, "BACKGROUND")
-        bar.back:SetAllPoints()
-        bar.back:SetColorTexture(0.031, 0.035, 0.043, 1)
-        meter.bars[index] = bar
-    end
+local function read_sizes()
+    local height = library.read_size(-5)
+    return 3 * height, height, library.read_size(-6)
 end
 
-local function update_meter_layout()
+local function read_drop(frame, height, between)
+    local bar_foot, frame_foot = frame.power:GetBottom(), frame:GetBottom()
+    if not (bar_foot and frame_foot) or bar_foot - frame_foot <= height then return between end
+    return math.floor((bar_foot - frame_foot - height) / 2 + 0.5)
+end
+
+local function create_pill(frame, index, top)
+    local pill = CreateFrame("Frame", nil, frame)
+    pill.edge = library.create_surface(pill, "ARTWORK", 0)
+    pill.back = library.create_surface(pill, "ARTWORK", 1)
+    pill.fill = CreateFrame("StatusBar", nil, pill)
+    pill.fill:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+    pill.fill:GetStatusBarTexture():SetGradient("VERTICAL", library.create_colour({ top[1] * 0.62, top[2] * 0.62, top[3] * 0.62 }), library.create_colour(top))
+    pill.fill:SetMinMaxValues(20 * (index - 1), 20 * (index - 1) + STEP)
+    pill.fill:SetValue(0)
+    return pill
+end
+
+local function create_row()
     local frame = VGAUnitFrame_target
-    if not frame or not meter then return end
-    local base, gap = library.read_base(), library.read_size(-4)
-    local width = math.max(2, library.read_size(-6))
-    meter:ClearAllPoints()
-    meter:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -library.read_size(-2), gap)
-    meter:SetSize(5 * width + 4 * (width - 1), math.floor(base * 1.08 + 0.5))
-    for index, bar in ipairs(meter.bars) do
-        bar:ClearAllPoints()
-        bar:SetSize(width, math.floor(base * (0.36 + 0.18 * (index - 1)) + 0.5))
-        bar:SetPoint("BOTTOMLEFT", meter, "BOTTOMLEFT", (index - 1) * (2 * width - 1), 0)
+    if not (frame and frame.power) then return end
+    row = {}
+    for index, top in ipairs(library.colours.steps) do row[index] = create_pill(frame, index, top) end
+    local _, height, between = read_sizes()
+    frame.extra_height = height + between
+end
+
+local function update_row_layout()
+    local frame = VGAUnitFrame_target
+    if not (row and frame) then return end
+    local width, height, between = read_sizes()
+    local gap = library.read_size(-6)
+    local span = POINTS * width + (POINTS - 1) * gap
+    frame.extra_height = height + between
+    local drop = read_drop(frame, height, between)
+    for index, pill in ipairs(row) do
+        pill:SetSize(width, height)
+        pill:ClearAllPoints()
+        pill:SetPoint("TOPLEFT", frame.power, "BOTTOM", -span / 2 + (index - 1) * (width + gap), -drop)
+        library.update_surface(pill.edge, -1, height / 2 + 1, EDGE, EDGE)
+        library.update_surface(pill.back, 0, height / 2, OPEN, OPEN)
+        pill.fill:SetAllPoints()
     end
 end
 
-local function update_meter_value()
-    if not meter then return end
+local function update_row_value()
+    if not row then return end
     local status = UnitExists("target") and UnitThreatSituation("player", "target")
     local listed = (issecretvalue and issecretvalue(status)) or status ~= nil
     local shown = UnitExists("target") and UnitCanAttack("player", "target") and listed
-    meter:SetShown(shown and true or false)
-    if not shown then return end
     local _, _, share = UnitDetailedThreatSituation("player", "target")
-    for _, bar in ipairs(meter.bars) do
-        bar:SetValue(share or 0)
+    for _, pill in ipairs(row) do
+        pill:SetShown(shown and true or false)
+        pill.fill:SetValue(shown and share or 0)
     end
 end
 
 local function update_threat()
-    update_meter_layout()
-    update_meter_value()
+    update_row_layout()
+    update_row_value()
 end
 
 local function update_event(event)
     if event == "PLAYER_LOGIN" then
-        create_meter()
+        create_row()
         library.create_element("threat", { update = update_threat })
+        library.update_elements()
     else
-        update_meter_value()
+        update_row_value()
     end
 end
 

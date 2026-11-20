@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html): a quest with a time limit shows the time left on a small line under its title, the word first and the time after it, so only the line's end changes, green, yellow in the last two minutes, red in the last thirty seconds; a quest whose targets lie in a dungeon carries the game's word Dungeon after its title, quiet grey - by the game's quest tag, or by Questie's dungeon list for the quest's zone -; a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, up to 384 draft pixels, the owner's third wider less 16; an objective longer than that is broken at its words onto further lines, the count on the first, a pixel between its lines, each line of a done one struck through as long as its words - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
+-- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html): a quest whose objectives are all done shows its title alone, its struck objectives hidden unless the tab Quests says to show them; a quest with a time limit shows the time left on a small line under its title, the word first and the time after it, so only the line's end changes, green, yellow in the last two minutes, red in the last thirty seconds; a quest whose targets lie in a dungeon carries the game's word Dungeon after its title, quiet grey - by the game's quest tag, or by Questie's dungeon list for the quest's zone -; a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, at least 250 draft pixels, up to the most width chosen in the settings - Schmal 250, Mittel 320, Breit 384, the default; an objective longer than that is broken at its words onto further lines, the count on the first, a pixel between its lines, each line of a done one struck through as long as its words - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
 
 -- {K0260} {K0370} {K0371} {K0390} {K0401} {K0408} {K0422} {K0424}
 
@@ -18,7 +18,9 @@ local SOURCE = { 0.525, 0.725, 0.91 }
 local DIVIDER = { 0.137, 0.149, 0.173 }
 local TICK = { 0.498, 0.816, 0.416 }
 local WIDTH = 300
-local MOST_WIDTH = 384
+local MIN_WIDTH = 250
+local MOST_WIDTHS = { narrow = 250, middle = 320, wide = 384 }
+local WIDTH_KEYS = { "narrow", "middle", "wide" }
 local TIME_GREEN = { 0.37, 0.82, 0.42 }
 local TIME_YELLOW = { 0.95, 0.79, 0.25 }
 local TIME_RED = { 0.93, 0.27, 0.22 }
@@ -110,6 +112,12 @@ local function create_quests_page(page)
     page.rows = {
         library.create_choice_row(page, texts.order, { texts.nearest_first, texts.difficulty, texts.journal }, chosen, function(index)
             library.update_choice_setting("quest_order", ORDERS[index])
+        end),
+        library.create_choice_row(page, texts.finished_quests, { texts.parts_hidden, texts.parts_shown }, LibVGASettings.quest_finished == "show" and 2 or 1, function(index)
+            library.update_choice_setting("quest_finished", index == 1 and "hide" or "show")
+        end),
+        library.create_choice_row(page, texts.most_width, { texts.narrow, texts.middle, texts.wide }, ({ narrow = 1, middle = 2, wide = 3 })[LibVGASettings.quest_width or "wide"] or 3, function(index)
+            library.update_choice_setting("quest_width", WIDTH_KEYS[index])
         end),
     }
     for _, row in ipairs(library.create_widget_rows(page, "quests", { { key = "quests", title = texts.quest_tracker } })) do page.rows[#page.rows + 1] = row end
@@ -377,11 +385,19 @@ local function update_objective(objective, data, top, width, colour_of_quest)
     return height
 end
 
+local function check_all_done(data)
+    for _, objective_data in ipairs(data.objectives) do
+        if not objective_data.done then return false end
+    end
+    return true
+end
+
 local function update_quest_objectives(quest, data, top, width)
     local strike, gap = LibVGASettings.quest_done ~= "hide", read_draft(5)
+    local folded = LibVGASettings.quest_finished ~= "show" and check_all_done(data)
     local shown = 0
     for _, objective_data in ipairs(data.objectives) do
-        if strike or not objective_data.done then
+        if not folded and (strike or not objective_data.done) then
             shown = shown + 1
             quest.objectives[shown] = quest.objectives[shown] or create_objective(quest)
             quest.objectives[shown]:Show()
@@ -506,8 +522,8 @@ end
 local function read_width(shown, total)
     local pad = read_draft(12)
     local head = 2 * pad + read_draft(16) + read_draft(8) + read_text_width(library.texts.quests_zone, "bold") + read_draft(16) + read_text_width(shown and (#shown .. " " .. library.texts.of .. " " .. total) or "", "small") + read_draft(14)
-    local widest = math.max(read_draft(WIDTH), head)
-    local most = read_draft(MOST_WIDTH)
+    local widest = math.max(read_draft(MIN_WIDTH), head)
+    local most = read_draft(MOST_WIDTHS[LibVGASettings.quest_width or "wide"] or MOST_WIDTHS.wide)
     for _, data in ipairs(shown) do widest = math.max(widest, math.min(read_quest_width(data), most)) end
     return math.ceil(widest)
 end

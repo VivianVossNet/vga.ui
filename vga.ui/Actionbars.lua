@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 -- Scope: vga.ui's own action bars as manual/view/vga-mainbar.html draws them, each key edged as the bags' slots - three pixels with gently rounded corners in the slot's grey, laid over the icon: eight bars of twelve protected keys of our own, on Blizzard's own pages - the main bar on the player's action slots, turning its page with stance, form, vehicle and override as Blizzard's does, the second on page 6, the third on 5, the fourth and fifth on 3 and 4, Blizzard's right bars, the sixth to eighth on 13 to 15 -, bound to the player's own keys, each shown or hidden as the settings say, bars 4 to 8 at first as the player had them in Blizzard's settings; two rows by default, the second and third bar side by side above the main bar, the second at the left, or all in one row, as the settings' »Leisten« page says, the bottom row centred on the screen whole; in one row two or three bars as the settings say, three by default, in two rows always three; the whole element - bars, game menu, bag bar and gryphons - scaled down as far as needed for the gryphons' outer ends to fit the screen's width, the widget itself never scaled but drawn around them at whole pixels, so its pieces show no seams; the game menu and the bag bar beside them; behind them one widget in the tooltip's look with its gold corner, the experience bar of Experience.lua between the rows; the keys dressed as the draft's .key; the game's own gryphons drawn at both ends. Bars 4 to 8 always stand free, each in a widget of its own. In the third form, »lose«, the gryphons and the shared widget go: each bar, the game menu, the bag bar and the experience bar stands in a widget of its own, with its own ground and gold corner, moved in the edit mode, at first scattered over the screen so that arranging them is plainly the next step; each free bar stacks its keys 1, 2, 3, 4, 6 or 12 to a row and each area is drawn small, normal or large - 80, 100 or 125 per cent - as the »Leisten« page says, which Barsettings.lua draws. Blizzard's eight bars and experience bars are put away in a hidden frame and put back there whenever Blizzard's managed layout takes them out again; nothing protected is moved in a fight. The game's range dot, which an unbound key shows in its key's corner, is drawn in the game's Arial Narrow, since our faces lack the glyph; the bars are laid anew when the game's Edit Mode layouts arrive, late on a character's first login.
 
--- {K0375} {K0376} {K0377} {K0380} {K0382} {K0384} {K0385} {K0419}
+-- {K0375} {K0376} {K0377} {K0380} {K0382} {K0384} {K0385} {K0419} {K0482}
 
 local _, vga = ...
 local library = LibVGA
@@ -112,6 +112,8 @@ local function create_key(bar, name, index, command)
     key.vga_line = library.create_surface(key, "BACKGROUND", -8)
     key.vga_notches = library.create_notches(key, "OVERLAY", 7)
     key.vga_edge = library.create_ring(key, "OVERLAY", 6, nil, true)
+    library.create_shimmer(key)
+    library.delete_shimmer(key)
     for _, state in ipairs({ key:GetHighlightTexture(), key:GetPushedTexture(), key:GetCheckedTexture() }) do
         state:SetTexture("Interface\\Buttons\\WHITE8X8")
         state:SetVertexColor(1, 1, 1, 0.15)
@@ -418,6 +420,60 @@ local function update_mainbar_safely()
     library.update_safely("mainbar", update_mainbar)
 end
 
+local relayout_pending = false
+
+local function update_relayout_now()
+    relayout_pending = false
+    update_mainbar_safely()
+end
+
+local function update_relayout_soon()
+    if relayout_pending then return end
+    relayout_pending = true
+    C_Timer.After(0, update_relayout_now)
+end
+
+local function write_pushed(spell, slot)
+    LibVGASettings.key_fresh = LibVGASettings.key_fresh or {}
+    LibVGASettings.key_fresh[slot] = spell
+end
+
+local function delete_used(spell)
+    for slot, fresh in pairs(LibVGASettings.key_fresh or {}) do
+        if fresh == spell then LibVGASettings.key_fresh[slot] = nil end
+    end
+end
+
+local function check_fresh_key(key)
+    local slot = key.action
+    local spell = slot and (LibVGASettings.key_fresh or {})[slot]
+    if not spell then return false end
+    local kind, id = GetActionInfo(slot)
+    if kind == "spell" and id == spell then return true end
+    LibVGASettings.key_fresh[slot] = nil
+    return false
+end
+
+local function update_key_shimmer()
+    if not mainbar then return end
+    local phase, side = library.read_shimmer_phase(), read_draft(38)
+    for _, bar in ipairs(mainbar.bars) do
+        for _, key in ipairs(bar.keys) do
+            if key:IsVisible() and check_fresh_key(key) then
+                library.update_shimmer(key, phase, side)
+                key.vga_fresh = true
+            elseif key.vga_fresh then
+                library.delete_shimmer(key)
+                key.vga_fresh = false
+            end
+        end
+    end
+end
+
+local function update_key_shimmer_safely()
+    library.update_safely("mainbar shimmer", update_key_shimmer)
+end
+
 local function create_area(key, x, y)
     local area = library.create_frame("VGALoose" .. key, UIParent)
     area:SetFrameStrata("BACKGROUND")
@@ -449,15 +505,33 @@ local function create_mainbar()
     mainbar = widget
     write_blizzard_shown()
     if EventRegistry then EventRegistry:RegisterCallback("EditMode.Exit", update_mainbar_safely, mainbar) end
+    for _, blizzard in ipairs({ MicroMenu, MicroMenuContainer, BagsBar }) do
+        if blizzard and blizzard.Layout then hooksecurefunc(blizzard, "Layout", update_relayout_soon) end
+    end
+    widget:SetScript("OnUpdate", update_key_shimmer_safely)
     library.create_element("mainbar", { title = library.texts.bars, icon = "TabBars", update = update_mainbar, tab = vga.create_bars_page })
     update_bindings()
 end
 
 local events = CreateFrame("Frame")
-for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_XP_UPDATE", "UPDATE_EXHAUSTION", "UI_SCALE_CHANGED", "UPDATE_BINDINGS", "EDIT_MODE_LAYOUTS_UPDATED" }) do
+for _, name in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_XP_UPDATE", "UPDATE_EXHAUSTION", "UI_SCALE_CHANGED", "UPDATE_BINDINGS", "EDIT_MODE_LAYOUTS_UPDATED", "SPELLS_CHANGED", "PLAYER_LEVEL_UP", "SPELL_PUSHED_TO_ACTIONBAR" }) do
     pcall(events.RegisterEvent, events, name)
 end
-events:SetScript("OnEvent", function(_, event)
+pcall(events.RegisterUnitEvent, events, "UNIT_SPELLCAST_SUCCEEDED", "player")
+events:SetScript("OnEvent", function(_, event, first, second, third)
+    if event == "SPELL_PUSHED_TO_ACTIONBAR" then
+        if second and second > 0 then write_pushed(first, second) end
+        update_relayout_soon()
+        return
+    end
+    if event == "UNIT_SPELLCAST_SUCCEEDED" then
+        if first == "player" then delete_used(third) end
+        return
+    end
+    if event == "SPELLS_CHANGED" or event == "PLAYER_LEVEL_UP" then
+        update_relayout_soon()
+        return
+    end
     if event == "PLAYER_LOGIN" then library.update_safely("mainbar login", create_mainbar) end
     if event == "UPDATE_BINDINGS" and mainbar and not InCombatLockdown() then library.update_safely("mainbar keys", update_bindings) end
     update_mainbar_safely()

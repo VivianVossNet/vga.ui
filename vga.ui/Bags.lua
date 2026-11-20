@@ -18,10 +18,6 @@ local RADIUS = 4
 local EDGE_WIDTH = 3
 local FRESH_SECONDS = 300
 local DIM = 0.25
-local CYCLE = 3
-local RUN_END = 0.26
-local STAR_FROM, STAR_PEAK, STAR_END = 0.24, 0.27, 0.34
-local TRAIL = { { 0, 1 }, { 0.025, 0.6 }, { 0.05, 0.3 } }
 local SLOT_GROUND = { 0.031, 0.035, 0.043 }
 local SLOT_EDGE = { 0.18, 0.192, 0.22 }
 local FIELD_INK = { 0.435, 0.424, 0.4 }
@@ -79,23 +75,6 @@ local function update_button_parts(button)
     if button.icon then button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
 end
 
-local function create_shimmer(button)
-    button.vga_bright = button:CreateTexture(nil, "OVERLAY", nil, 1)
-    button.vga_bright:SetAllPoints()
-    button.vga_bright:SetColorTexture(1, 1, 1, 0.18)
-    button.vga_bright:SetBlendMode("ADD")
-    button.vga_trail = {}
-    for index in ipairs(TRAIL) do
-        local dot = button:CreateTexture(nil, "OVERLAY", nil, 7)
-        dot:SetTexture(library.media .. "Disc")
-        dot:SetBlendMode("ADD")
-        button.vga_trail[index] = dot
-    end
-    button.vga_star = button:CreateTexture(nil, "OVERLAY", nil, 7)
-    button.vga_star:SetTexture(library.media .. "Star")
-    button.vga_star:SetBlendMode("ADD")
-end
-
 local function create_slot(holder, slot)
     local button = CreateFrame("ItemButton", nil, holder, "ContainerFrameItemButtonTemplate")
     button:SetID(slot)
@@ -107,7 +86,7 @@ local function create_slot(holder, slot)
     button.vga_quest = library.create_text(button, "figure", colours.gold)
     button.vga_quest:SetText("?")
     update_button_parts(button)
-    create_shimmer(button)
+    library.create_shimmer(button)
     return button
 end
 
@@ -153,11 +132,7 @@ local function update_slot_look(button, item, new, quest)
     library.update_surface(button.vga_ground, 0, radius, SLOT_GROUND, SLOT_GROUND)
     library.update_notches(button.vga_notches, button, radius, colours.ground)
     library.update_ring(button.vga_edge, EDGE_WIDTH, edge, share)
-    button.vga_bright:SetShown(new)
-    if not new then
-        for _, dot in ipairs(button.vga_trail) do dot:Hide() end
-        button.vga_star:Hide()
-    end
+    if not new then library.delete_shimmer(button) end
 end
 
 local function check_fresh(bag, slot, item)
@@ -196,62 +171,18 @@ local function update_slot(button, bag, slot)
     return item ~= nil
 end
 
-local function read_point(share, side)
-    local walked = (share % 1) * 4
-    local edge, along = math.floor(walked), walked % 1
-    if edge == 0 then return along * side, 0 end
-    if edge == 1 then return side, -along * side end
-    if edge == 2 then return side - along * side, -side end
-    return 0, -side + along * side
-end
-
-local function update_trail(button, phase, side)
-    local dot = read_draft(4)
-    for index, step in ipairs(TRAIL) do
-        local piece = button.vga_trail[index]
-        local share = phase / RUN_END - step[1]
-        piece:SetShown(phase < RUN_END and share >= 0)
-        if piece:IsShown() then
-            local across, down = read_point(share, side)
-            local colour = index == 1 and { 1, 1, 1 } or colours.gold_high
-            piece:SetSize(dot, dot)
-            piece:ClearAllPoints()
-            piece:SetPoint("CENTER", button, "TOPLEFT", across, down)
-            piece:SetVertexColor(colour[1], colour[2], colour[3], step[2])
-        end
-    end
-end
-
-local function update_star(button, phase)
-    local star = button.vga_star
-    star:SetShown(phase >= STAR_FROM and phase <= STAR_END)
-    if not star:IsShown() then return end
-    local rising = phase <= STAR_PEAK
-    local share = rising and (phase - STAR_FROM) / (STAR_PEAK - STAR_FROM) or (phase - STAR_PEAK) / (STAR_END - STAR_PEAK)
-    local scale = rising and 0.3 + 0.9 * share or 1.2 - 0.8 * share
-    local size = read_draft(14) * scale
-    star:SetSize(size, size)
-    star:ClearAllPoints()
-    star:SetPoint("CENTER", button, "TOPLEFT", read_draft(1), -read_draft(1))
-    star:SetRotation(math.rad(rising and 45 * share or 45 + 45 * share))
-    star:SetAlpha(rising and share or 1 - share)
-end
-
 local function update_stale(button)
     button.vga_new = false
-    button.vga_bright:Hide()
-    for _, dot in ipairs(button.vga_trail) do dot:Hide() end
-    button.vga_star:Hide()
+    library.delete_shimmer(button)
 end
 
 local function update_shimmer()
-    local phase, side = (GetTime() % CYCLE) / CYCLE, read_draft(SLOT)
+    local phase, side = library.read_shimmer_phase(), read_draft(SLOT)
     for _, button in ipairs(bags.slots) do
         if button.vga_new and button.vga_at and time() - button.vga_at >= FRESH_SECONDS then
             update_stale(button)
         elseif button:IsShown() and button.vga_new then
-            update_trail(button, phase, side)
-            update_star(button, phase)
+            library.update_shimmer(button, phase, side)
         end
     end
 end

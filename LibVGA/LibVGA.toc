@@ -2,7 +2,7 @@
 ## Title: LibVGA
 ## Notes: The graphics library of vga.ui: frames, widgets, bars and settings in VGA's look, for every VGA addon.
 ## Author: Vivian Voss
-## Version: 0.9.4
+## Version: 0.9.5
 ## IconTexture: Interface/AddOns/LibVGA/Media/Mark
 ## SavedVariables: LibVGAAccount, LibVGASettings
 ## SavedVariablesPerCharacter: LibVGACharacter
@@ -21,6 +21,7 @@ Bar.lua
 Counter.lua
 Money.lua
 Bead.lua
+Shimmer.lua
 Settings.lua
 Gamepanel.lua
 Widgets.lua

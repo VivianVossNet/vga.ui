@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 -- Scope: vga.ui's player frame, target frame and pet frame, each where Blizzard's own stands in the player's layout: the level's shield, the name and its class or kind, health and power, the target mirrored to the player, the portrait's rim one smooth, rounded frame in one colour over the picture, its corners and sides cut from one texture - seven outside, three thick, four inside -, clicked to target; Blizzard's own frames hidden.
 
--- {K0267} {K0268} {K0275} {K0276} {K0294} {K0297} {K0299} {K0300} {K0302} {K0329} {K0330} {K0334} {K0342} {K0345} {K0346} {K0360}
+-- {K0481} {K0267} {K0268} {K0275} {K0276} {K0294} {K0297} {K0299} {K0300} {K0302} {K0329} {K0330} {K0334} {K0342} {K0345} {K0346} {K0360}
 
 local _, vga = ...
 local library = LibVGA
@@ -22,6 +22,11 @@ local BADGE_BOTTOM = { 0.082, 0.09, 0.106 }
 local BADGE_TEXT = { 0.945, 0.812, 0.431 }
 local POWERS = { [0] = "power", [1] = "rage", [2] = "focus", [3] = "energy", [6] = "runic" }
 local frames = {}
+local FIGHT = { 0.86, 0.12, 0.1 }
+local FIGHT_LOW = 0.2
+local FIGHT_HIGH = 0.75
+local FIGHT_PULSE = 1.4
+local FIGHT_SPREAD = 64 / 42 * 0.96
 local GAINS = {
     HEAL = "health", HEAL_CRIT = "health", PERIODIC_HEAL = "health", PERIODIC_HEAL_CRIT = "health",
     ENERGIZE = "power", PERIODIC_ENERGIZE = "power",
@@ -178,6 +183,30 @@ local function update_rim(pieces, around, corner)
     end
 end
 
+local function create_fight_glow(frame)
+    frame.fight = frame:CreateTexture(nil, "ARTWORK", nil, -3)
+    frame.fight:SetTexture(library.media .. "SlotGlow")
+    frame.fight:SetVertexColor(FIGHT[1], FIGHT[2], FIGHT[3], 1)
+    frame.fight:SetBlendMode("ADD")
+    frame.fight.pulse = frame.fight:CreateAnimationGroup()
+    frame.fight.pulse:SetLooping("BOUNCE")
+    local fade = frame.fight.pulse:CreateAnimation("Alpha")
+    fade:SetFromAlpha(FIGHT_LOW)
+    fade:SetToAlpha(FIGHT_HIGH)
+    fade:SetDuration(FIGHT_PULSE)
+    fade:SetSmoothing("IN_OUT")
+    frame.fight:Hide()
+end
+
+local function update_fight_glow()
+    local glow = frames.player and frames.player.fight
+    if not glow then return end
+    local fighting = UnitAffectingCombat("player") and true or false
+    glow:SetShown(fighting)
+    if fighting and not glow.pulse:IsPlaying() then glow.pulse:Play() end
+    if not fighting then glow.pulse:Stop() end
+end
+
 local function create_frame(unit, mirrored)
     local frame = library.create_frame("VGAUnitFrame_" .. unit, UIParent, "SecureUnitButtonTemplate")
     frame.unit = unit
@@ -195,6 +224,7 @@ local function create_frame(unit, mirrored)
     frame.well = frame:CreateTexture(nil, "ARTWORK", nil, 1)
     frame.well:SetColorTexture(colours.ground[1], colours.ground[2], colours.ground[3], 1)
     frame.portrait = frame:CreateTexture(nil, "ARTWORK", nil, 2)
+    if unit == "player" then create_fight_glow(frame) end
     frame.view = CreateFrame("Frame", nil, frame)
     frame.view:SetClipsChildren(true)
     frame.view:SetFrameLevel(frame:GetFrameLevel() + 1)
@@ -300,6 +330,12 @@ local function update_portrait_layout(frame)
     frame.portrait:SetPoint("CENTER", frame.rim, "CENTER")
     frame.well:ClearAllPoints()
     frame.well:SetAllPoints(frame.portrait)
+    if frame.fight then
+        local glow = (portrait + 2 * rim) * FIGHT_SPREAD
+        frame.fight:SetSize(glow, glow)
+        frame.fight:ClearAllPoints()
+        frame.fight:SetPoint("CENTER", frame.rim, "CENTER")
+    end
     update_rim(frame.edges, frame.rim, radius)
     library.update_surface(frame.rim_line, -1, radius + 1, BLACK, BLACK)
     for _, side in pairs(frame.edges) do
@@ -362,12 +398,15 @@ local function update_event(event, unit)
         library.create_place(pet, "pet", "TOPRIGHT", player, 0, -(library.read_cast_room() + 2 * library.read_size(-4)), "BOTTOMRIGHT")
         delete_blizzard_frames()
         library.create_element("units", { title = UNITFRAME_LABEL or "Units", update = update_units })
-        for _, name in ipairs({ "PLAYER_TARGET_CHANGED", "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_LEVEL", "UNIT_NAME_UPDATE", "UNIT_PORTRAIT_UPDATE", "UNIT_CLASSIFICATION_CHANGED", "PLAYER_ENTERING_WORLD", "UNIT_PET", "PLAYER_REGEN_ENABLED", "UNIT_MODEL_CHANGED", "QUEST_LOG_UPDATE", "UNIT_QUEST_LOG_CHANGED", "COMBAT_TEXT_UPDATE" }) do
+        for _, name in ipairs({ "PLAYER_TARGET_CHANGED", "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_LEVEL", "UNIT_NAME_UPDATE", "UNIT_PORTRAIT_UPDATE", "UNIT_CLASSIFICATION_CHANGED", "PLAYER_ENTERING_WORLD", "UNIT_PET", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "UNIT_MODEL_CHANGED", "QUEST_LOG_UPDATE", "UNIT_QUEST_LOG_CHANGED", "COMBAT_TEXT_UPDATE" }) do
             pcall(events.RegisterEvent, events, name)
         end
         update_units()
         C_Timer.After(1, function() library.update_safely("units portrait", update_units) end)
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        update_fight_glow()
     elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_ENTERING_WORLD" or event == "UNIT_PET" or event == "PLAYER_REGEN_ENABLED" or event == "QUEST_LOG_UPDATE" or event == "UNIT_QUEST_LOG_CHANGED" then
+        update_fight_glow()
         update_units()
     elseif event == "COMBAT_TEXT_UPDATE" then
         local bar = GAINS[unit] and frames.player and frames.player[GAINS[unit]]
