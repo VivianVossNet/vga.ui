@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's nameplates as the accepted draft draws them: the bar on top in a black rim, grey when another holds the loot, the level either in a tab centred on it that ends flat on the bar, its number in the enemy's difficulty colour and the kind's chevron beside it, or as a bare number at the bar's left above it in a thick black edge, the kind's chevron after it, as the settings say; the name beneath, a thin cast bar under the name, the quest bag right behind the bar, Blizzard's own debuff list moved above our bar, so the player's debuffs show in a fight too; an edge behind the bar and the tab together - on the current target in the game's own difficulty colour, as Blizzard colours the level, grey easy to red hard, gold where there is none, black on every other plate; Blizzard's own plate hidden, and kept hidden when it sets its alpha again; another addon's icon on the plate hidden, so only our bag shows; a friendly player or NPC wears the friends' plate of Friends.lua instead.
+-- Scope: vga.ui's nameplates as the accepted draft draws them: the bar on top in a black rim, grey when another holds the loot, the level either in a tab centred on it that ends flat on the bar, its number in the enemy's difficulty colour and the kind's chevron beside it, or as a bare number at the bar's left above it in a thick black edge, the kind's chevron after it, as the settings say; the name beneath, a thin cast bar under the name, gone as soon as the unit no longer casts (K0590), the quest bag right behind the bar, Blizzard's own debuff list moved above our bar, so the player's debuffs show in a fight too; an edge behind the bar and the tab together - on the current target in the game's own difficulty colour, as Blizzard colours the level, grey easy to red hard, gold where there is none, black on every other plate; Blizzard's own plate hidden, and kept hidden when it sets its alpha again; another addon's icon on the plate hidden, so only our bag shows; a friendly player or NPC wears the friends' plate of Friends.lua instead.
 
--- {K0269} {K0270} {K0271} {K0272} {K0273} {K0274} {K0301} {K0321} {K0323} {K0326} {K0328} {K0329} {K0330} {K0334} {K0341} {K0347} {K0348} {K0360} {K0351} {K0364} {K0365} {K0367} {K0368} {K0369}
+-- {K0269} {K0270} {K0271} {K0272} {K0273} {K0274} {K0301} {K0321} {K0323} {K0326} {K0328} {K0329} {K0330} {K0334} {K0341} {K0347} {K0348} {K0360} {K0351} {K0364} {K0365} {K0367} {K0368} {K0369} {K0590}
 
 local _, vga = ...
 local library = LibVGA
@@ -59,6 +59,7 @@ local function create_plate(owner)
     plate.name = library.create_text(plate, "bold", { 1, 1, 1 })
     plate.name:SetWordWrap(false)
     plate.cast = library.create_bar(plate, "gold")
+    plate.cast:HookScript("OnUpdate", vga.update_cast_watch)
     plate.cast:Hide()
     plate.friend = vga.create_friend(plate)
     plate.parts = { plate.halo, plate.tab, plate.bar, plate.mark, plate.name }
@@ -207,6 +208,7 @@ local function update_plate_cast(plate, unit, ended)
         return
     end
     local duration = vga.check_casting(unit) and ((UnitCastingDuration and UnitCastingDuration(unit)) or (UnitChannelDuration and UnitChannelDuration(unit)))
+    plate.cast.unit = unit
     if duration and plate.cast.SetTimerDuration then
         plate.cast:SetTimerDuration(duration)
         plate.cast:Show()

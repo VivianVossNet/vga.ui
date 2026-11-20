@@ -1,9 +1,10 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The nameplate of a friendly player or NPC, as manual/view/vga-plate-friends.html draws form C: no level, no bar - the guild or the NPC's title and the name divided by the line - the name beneath by default, above as the settings say -, as the settings say, by one thin line five pixels longer on either side than the longer of the two - filled in the name's colour as far as the unit's health reaches, grey where it is missing, so a wounded friend shows in passing; without a title the line is there only while health is missing, gone at full health - the game itself decides, by a curve over the secret health, since vga.ui may not read it -, or framed in a faint ground with a thin rounded line, both in the game's own name colour (UnitSelectionColor, as Blizzard's plates colour names); a cast in a fight runs in gold over the line, as thin as it. The game's friendly plates - players, NPCs, their pets and minions - and its always-show setting are switched on while vga.ui runs, so every friendly unit wears it, the untargeted smaller by the game's own plate scale, and the player's own setting restored at logout.
+-- Scope: The nameplate of a friendly player or NPC, as manual/view/vga-plate-friends.html draws form C: no level, no bar - the guild or the NPC's title and the name divided by the line - the name beneath by default, above as the settings say -, as the settings say, by one thin line five pixels longer on either side than the longer of the two - filled in the name's colour as far as the unit's health reaches, grey where it is missing, so a wounded friend shows in passing; without a title the line is there only while health is missing, gone at full health - the game itself decides, by a curve over the secret health, since vga.ui may not read it -, or framed in a faint ground with a thin rounded line, both in the game's own name colour (UnitSelectionColor, as Blizzard's plates colour names); a cast in a fight runs in gold over the line, as thin as it, and goes as soon as the unit no longer casts, asked four times a second while it shows, so no ended cast stays as a full gold line (K0590). The game's friendly plates - players, NPCs, their pets and minions - and its always-show setting are switched on while vga.ui runs, so every friendly unit wears it, the untargeted smaller by the game's own plate scale, and the player's own setting restored at logout.
 
--- {K0347} {K0349} {K0350} {K0351} {K0352} {K0381}
+-- {K0347} {K0349} {K0350} {K0351} {K0352} {K0381} {K0590}
 
+local CAST_CHECK = 0.25
 local _, vga = ...
 local library = LibVGA
 local SWITCHES = {
@@ -52,6 +53,7 @@ function vga.create_friend(plate)
     friend.cast:SetStatusBarColor(library.colours.gold[1], library.colours.gold[2], library.colours.gold[3], 1)
     friend.cast:SetAllPoints(friend.line)
     friend.cast:SetFrameLevel(friend:GetFrameLevel() + 2)
+    friend.cast:HookScript("OnUpdate", vga.update_cast_watch)
     friend.cast:Hide()
     friend.label = CreateFrame("Frame", nil, friend)
     friend.label.ground = library.create_surface(friend.label, "BACKGROUND", 0)
@@ -128,8 +130,16 @@ function vga.update_friend_health(friend, unit)
     friend.health:SetAlpha(alpha)
 end
 
+function vga.update_cast_watch(bar, elapsed)
+    bar.waited = (bar.waited or 0) + elapsed
+    if bar.waited < CAST_CHECK then return end
+    bar.waited = 0
+    if not (bar.unit and vga.check_casting(bar.unit)) then bar:Hide() end
+end
+
 function vga.update_friend_cast(friend, unit)
     local duration = vga.check_casting(unit) and ((UnitCastingDuration and UnitCastingDuration(unit)) or (UnitChannelDuration and UnitChannelDuration(unit)))
+    friend.cast.unit = unit
     friend.cast:SetShown(duration and true or false)
     if duration then friend.cast:SetTimerDuration(duration) end
 end

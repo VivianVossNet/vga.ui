@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The player's buffs as the accepted draft draws .buffs and .buff (manual/view/vga-probe.html): icons with rounded corners in a black line, the time left small beneath each; from the player frame's left edge above it to the right, as many to a row as the frame's width holds, two rows at most; Blizzard's own buff frame hidden. Above the target frame the same, mirrored as the target frame is, from its right edge to the left: the target's buffs, then on a row of their own its debuffs, in a fine red line (K0580). Both are the game's own aura containers (K0584), which the game fills itself, in a fight too, where an addon may not read auras: each icon shows the game's tooltip of its aura under the mouse, and a click on one of the player's own buffs ends it; the time beneath each written short, one letter for its unit, in the smallest face, so neighbours do not run into each other (K0588); a dead target's auras are hidden, and so are the last target's once none is chosen (K0585, K0586).
+-- Scope: The player's buffs as the accepted draft draws .buffs and .buff (manual/view/vga-probe.html): icons with rounded corners in a black line, the time left small beneath each; from the player frame's left edge above it to the right, as many to a row as the frame's width holds, two rows at most; Blizzard's own buff frame hidden. Above the target frame the same, mirrored as the target frame is, from its right edge to the left: the target's buffs, then on a row of their own its debuffs, in a fine red line (K0580). Both are the game's own aura containers (K0584), which the game fills itself, in a fight too, where an addon may not read auras: each icon shows the game's tooltip of its aura under the mouse, and a click on one of the player's own buffs ends it; the time beneath each written short, one letter for its unit, in the smallest face, so neighbours do not run into each other (K0588); a dead target's auras are hidden, and so are the last target's once none is chosen (K0585, K0586); on a change of target the container is told to read its auras anew, which it does not do by itself, so no foe's auras pass to the next (K0591).
 
--- {K0261} {K0355} {K0580} {K0584} {K0585} {K0586} {K0588}
+-- {K0261} {K0355} {K0580} {K0584} {K0585} {K0586} {K0588} {K0591}
 
 local library = LibVGA
 local colours = library.colours
@@ -98,6 +98,13 @@ local function update_dead_target()
     end
 end
 
+local function update_new_target()
+    for _, strip in ipairs(strips) do
+        if strip.unit == "target" then strip.container:UpdateAllAuras() end
+    end
+    update_dead_target()
+end
+
 local function update_buffs()
     for _, strip in ipairs(strips) do update_strip(strip) end
     update_dead_target()
@@ -134,6 +141,8 @@ pcall(events.RegisterUnitEvent, events, "UNIT_FLAGS", "target")
 events:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_LOGIN" then
         library.update_safely("buffs login", create_buffs)
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        library.update_safely("buffs new target", update_new_target)
     else
         library.update_safely("buffs dead target", update_dead_target)
     end
