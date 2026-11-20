@@ -1,11 +1,12 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The navigation arrow centred between the player frame and the target frame: three gold chevrons, the foremost strongest and each behind it fainter, laid on the ground as if they lay on the way, each tilted back on its own, with room between them, the farther a little smaller - turned towards the nearest open quest's target and tilted back -, its distance beneath it; shown whenever the tracker has such a target, in a fight too, gone without one.
+-- Scope: The navigation arrow centred between the player frame and the target frame: three gold chevrons, the foremost strongest and each behind it fainter, laid on the ground as if they lay on the way, each tilted back on its own, with room between them, the farther a little smaller - turned towards the nearest open quest's target as the player sees it - the quest set as the game's tracked one, so the game's own navigation tells where its target stands on the screen, and the arrow points from the screen's middle there, turning with the camera however it is turned, behind the camera pointing back; where the game gives no screen place, by the character's facing - and tilted back (K0545) -, its distance beneath it; shown whenever the tracker has such a target, in a fight too, gone without one.
 
--- {K0370} {K0372} {K0398} {K0399}
+-- {K0370} {K0372} {K0398} {K0399} {K0545}
 
 local _, vga = ...
 local library = LibVGA
+local atan2 = math.atan2 or math.atan
 local colours = library.colours
 local TILT = 0.5
 local CHEVRONS = { { ahead = 1, alpha = 1 }, { ahead = 0, alpha = 0.6 }, { ahead = -1, alpha = 0.25 } }
@@ -72,9 +73,24 @@ local function update_place()
     return true
 end
 
+local function update_tracked(aim)
+    if not (aim.id and C_SuperTrack and C_SuperTrack.SetSuperTrackedQuestID) then return end
+    if C_SuperTrack.GetSuperTrackedQuestID() ~= aim.id then C_SuperTrack.SetSuperTrackedQuestID(aim.id) end
+end
+
+function vga.read_screen_heading(aim)
+    update_tracked(aim)
+    local marker = C_Navigation and C_Navigation.GetFrame and C_Navigation.GetFrame()
+    if not (marker and C_Navigation.HasValidScreenPosition and C_Navigation.HasValidScreenPosition()) then return nil end
+    local marker_x, marker_y = marker:GetCenter()
+    local middle_x, middle_y = WorldFrame:GetCenter()
+    if not (marker_x and middle_x) then return nil end
+    return atan2(middle_x - marker_x, marker_y - middle_y)
+end
+
 local function update_navigation()
     local aim = vga.quest_aim
-    local heading = aim and aim.point and vga.read_heading(aim.point)
+    local heading = aim and aim.point and (vga.read_screen_heading(aim) or vga.read_heading(aim.point))
     navigation:SetShown(heading ~= nil and update_place())
     if not heading then return end
     update_chevrons(heading)

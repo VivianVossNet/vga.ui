@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: Blizzard's chat in the accepted draft's look (manual/view/vga-probe.html .chat, .tabs2, .msgs, .in): Blizzard's background, border, tab and input art cleared; vga.ui's widget laid beneath tabs, lines and input, its ground the frames' setting, the small gold corner; the tabs quiet, the chosen one gold with a gold line beneath; the lines in Geologica at the player's own size, spaced by three tenths of it; the input let into the ground, dark, with a fine line, as wide as the lines above it, its line turning gold and its ground a shade lighter while it is typed into, a gold caret blinking after the last letter typed; once, a default size after the draft (420 by 150 at a 13-pixel base), the player's own resizing kept after. Blizzard's chat itself - channels, links, history, input - is untouched.
+-- Scope: Blizzard's chat in the accepted draft's look (manual/view/vga-probe.html .chat, .tabs2, .msgs, .in): Blizzard's background, border, tab and input art cleared; vga.ui's widget laid beneath tabs, lines and input, its ground the frames' setting, the small gold corner; the tabs quiet, the chosen one gold with a gold line beneath; the lines in Geologica at the player's own size, spaced by three tenths of it; the lines at 12 pixels by default, set once, the player's own size kept after (K0510); the widget's left edge the chat's own, never a docked tab's, so a docked window - the combat log with its quick buttons too - lies wholly inside it; the input let into the ground, dark, with a fine line, as wide as the lines above it, its line turning gold and its ground a shade lighter while it is typed into, a gold caret blinking after the last letter typed; once, a default size after the draft (420 by 150 at a 13-pixel base), the player's own resizing kept after. Blizzard's chat itself - channels, links, history, input - is untouched.
 
--- {K0264} {K0266} {K0358} {K0359} {K0362} {K0363}
+-- {K0264} {K0266} {K0358} {K0359} {K0362} {K0363} {K0510}
 
 local library = LibVGA
 local colours = library.colours
@@ -14,6 +14,7 @@ local BLINK = 0.5
 local TAB_QUIET = { 0.604, 0.588, 0.549 }
 local TAB_CHOSEN = { 0.945, 0.812, 0.431 }
 local LINE_SPACING = 0.3
+local FONT_SIZE = 12
 local skins = {}
 
 local function update_cleared(region)
@@ -118,7 +119,8 @@ local function update_chat(chat)
     local name, pad = chat:GetName(), library.read_size(-2)
     local tab, input = _G[name .. "Tab"], _G[name .. "EditBox"]
     skin:ClearAllPoints()
-    skin:SetPoint("TOPLEFT", tab or chat, "TOPLEFT", -pad, pad)
+    skin:SetPoint("LEFT", chat, "LEFT", -pad, 0)
+    skin:SetPoint("TOP", tab or chat, "TOP", 0, pad)
     skin:SetPoint("RIGHT", chat, "RIGHT", pad, 0)
     skin:SetPoint("BOTTOM", input and input:IsShown() and input or chat, "BOTTOM", 0, -pad)
     library.update_frame(skin)
@@ -152,6 +154,15 @@ local function update_default_size()
     LibVGASettings.chat_sized = true
 end
 
+local function update_default_font()
+    if LibVGASettings.chat_font_set then return end
+    for index = 1, NUM_CHAT_WINDOWS or 0 do
+        local chat = _G["ChatFrame" .. index]
+        if chat and FCF_SetChatWindowFontSize then FCF_SetChatWindowFontSize(nil, chat, FONT_SIZE) end
+    end
+    LibVGASettings.chat_font_set = true
+end
+
 local function update_chats_safely()
     library.update_safely("chats", update_chats)
 end
@@ -164,6 +175,7 @@ events:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_LOGIN" then
         library.create_element("chat", { update = update_chats })
         library.update_safely("chat size", update_default_size)
+        library.update_safely("chat font", update_default_font)
         for _, hook in ipairs({ "FCF_Tab_OnClick", "FCFDock_SelectWindow", "FCF_OpenTemporaryWindow", "ChatEdit_ActivateChat", "ChatEdit_DeactivateChat" }) do
             if _G[hook] then hooksecurefunc(hook, update_chats_safely) end
         end

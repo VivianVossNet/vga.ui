@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: LibVGA's frame in the tooltip's look, its rim and ground down to nothing, its place kept with both its own point and the screen's it is measured from - a frame that grows, as the quest tracker, always by its upper corner on its side of the screen, so it grows down and towards the middle, a place kept otherwise moved once to that corner -, so it stands after a reload exactly where it was let go, fixed but in the edit mode - its own and Blizzard's, whose start and end it follows; while arranging, the handles stand above every element of the game's own; its own, begun by »Anordnen …«, shows a large »Fertig« in VGA's orange in the middle of the screen that ends it; a widget let go is placed freely or, as the settings say, on a grid of eight by eight pixels. A frame that grows towards the middle may keep its place by its outer corner, the upper right on the right half of the screen. Two, six and fifteen seconds after entering the world every placed frame is checked against its saved place and set back where it stands elsewhere, each drift written down for finding its cause, marked where setting it back changes nothing because the screen's edge holds the frame. A place is kept from the nearest edges: the screen is cut into nine fields - corners, edges, middle - and a frame keeps its distance to the edges of its field, the middle to the middle, the distance kept in the owner's screen units and grown or shrunk with the screen like every size, so on another screen it stands in the same relation; a place kept the old way, from the lower left corner, is turned once into the new.
+-- Scope: LibVGA's frame in the tooltip's look, its rim and ground down to nothing, its place kept with both its own point and the screen's it is measured from - a frame that grows, as the quest tracker, always by its upper corner on its side of the screen, so it grows down and towards the middle, a place kept otherwise moved once to that corner -, so it stands after a reload exactly where it was let go, fixed but in the edit mode - its own and Blizzard's, whose start and end it follows; while arranging, the handles stand above every element of the game's own; its own, begun by »Anordnen …«, shows a large »Fertig« in VGA's orange in the middle of the screen that ends it; a widget let go is placed freely or, as the settings say, on a grid of eight by eight pixels. A frame that grows towards the middle may keep its place by its outer corner, the upper right on the right half of the screen. Two, six and fifteen seconds after entering the world every placed frame is checked against its saved place and set back where it stands elsewhere, each drift written down for finding its cause, marked where setting it back changes nothing because the screen's edge holds the frame. A place is kept from the nearest edges: the screen is cut into nine fields - corners, edges, middle - and a frame keeps its distance to the edges of its field, the middle to the middle, the distance kept in the owner's screen units and grown or shrunk with the screen like every size, so on another screen it stands in the same relation; a place kept the old way, from the lower left corner, is turned once into the new. A frame that grows from its outer top corner - the quest tracker - is set by that corner whenever it is placed: a place saved by another point, as older layouts and profiles keep, is turned into the top corner at once (K0546), so the frame never moves as it grows or shrinks.
 
--- {K0258} {K0299} {K0330} {K0334} {K0383} {K0426} {K0430} {K0446} {K0448}
+-- {K0258} {K0299} {K0330} {K0334} {K0383} {K0426} {K0430} {K0446} {K0448} {K0546}
 
 local library = LibVGA
 local colours = library.colours
@@ -16,13 +16,22 @@ function library.create_frame(name, parent, template)
     return frame
 end
 
+local grounded = setmetatable({}, { __mode = "k" })
+
 function library.update_frame(frame, fixed)
+    grounded[frame] = fixed or false
     local radius = library.read_size(-2)
     local ground = fixed or library.read_ground(frame.ground_key or frame.place_key)
     library.update_surface(frame.outline, -2, radius + 2, colours.edge, colours.edge, ground)
     library.update_surface(frame.edge, -1, radius + 1, { 0, 0, 0 }, { 0, 0, 0 }, ground)
     library.update_surface(frame.ground, 0, radius, { 0.071, 0.075, 0.09 }, { 0.043, 0.047, 0.059 }, ground)
     library.update_corner(frame.corner)
+end
+
+function library.update_grounds()
+    for frame, fixed in pairs(grounded) do
+        if not fixed then library.update_frame(frame) end
+    end
 end
 
 local movers = {}
@@ -48,6 +57,8 @@ local function read_place(place)
     return place[1], measured_from_foot and "BOTTOMLEFT" or place[1], place[2], place[3]
 end
 
+local update_outer_kept
+
 local function update_place(frame)
     local place = LibVGASettings and LibVGASettings.places and LibVGASettings.places[frame.place_key]
     local spot = frame.place_default
@@ -56,6 +67,7 @@ local function update_place(frame)
         local own, other, left, top = read_place(place)
         local share = own == other and library.read_screen_share() or 1
         frame:SetPoint(own, UIParent, other, left * share, top * share)
+        if frame.place_outer and not (own:find("^TOP") and own == other) then update_outer_kept(frame) end
     else
         frame:SetPoint(spot[1], spot[2], spot[3], spot[4], spot[5])
     end
@@ -216,6 +228,15 @@ end
 local function check_places(moment)
     if InCombatLockdown() or library.editing then return end
     for _, mover in pairs(movers) do pcall(check_place, mover, moment) end
+end
+
+function update_outer_kept(frame)
+    if not frame:GetTop() then return end
+    LibVGASettings.places[frame.place_key] = read_saved_place(frame)
+    local own, other, left, top = read_place(LibVGASettings.places[frame.place_key])
+    local share = library.read_screen_share()
+    frame:ClearAllPoints()
+    frame:SetPoint(own, UIParent, other, left * share, top * share)
 end
 
 local function update_old_place(mover)

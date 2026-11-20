@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The experience line's tooltips: every text on it explains itself when the mouse has rested on it for a second - the level, the rested bonus, the time to the next level, the system values, the money and the bag slots -; the system values' tooltip carries beneath its words three fine graphs of the last sixty minutes, frame rate, latency and memory, measured every thirty seconds and kept across a reload, each stretch coloured as the line colours its value, so a recent trouble shows at a glance.
+-- Scope: The experience line's tooltips: every text on it explains itself when the mouse has rested on it for a second - the level with the time to the next level beside it, the rested bonus, the system values, the money and the bag slots -; the system values' tooltip carries beneath its words three fine graphs of the last sixty minutes, frame rate, latency and memory, measured every thirty seconds and kept across a reload, each stretch coloured as the line colours its value, so a recent trouble shows at a glance. The bars explain themselves too, after the same second: the experience bar its standing in points, »1.234 / 5.600 Punkte«, the reputation bar - the one bar while a faction is watched, or the lower of both - the faction's name and its standing with the share, »Wohlwollend · 25 %« (K0552).
 
--- {K0388} {K0404} {K0428} {K0455}
+-- {K0388} {K0404} {K0428} {K0455} {K0552}
 
 local _, vga = ...
 local library = LibVGA
@@ -116,9 +116,12 @@ local function render_tip(hover)
     local reputation = hover.reputation and hover:GetParent().mode == "reputation"
     local title, lines = hover.title, hover.lines
     if reputation then title, lines = hover.reputation[1], { hover.reputation[2] } end
+    local heading, words = texts[title], {}
+    for index, key in ipairs(lines or {}) do words[index] = texts[key] end
+    if hover.read then heading, words = hover.read(hover:GetParent()) end
     GameTooltip:SetOwner(hover, "ANCHOR_TOP")
-    GameTooltip:AddLine(texts[title], colours.gold[1], colours.gold[2], colours.gold[3])
-    for _, key in ipairs(lines) do GameTooltip:AddLine(texts[key], colours.ink[1], colours.ink[2], colours.ink[3], true) end
+    GameTooltip:AddLine(heading, colours.gold[1], colours.gold[2], colours.gold[3])
+    for _, line in ipairs(words) do GameTooltip:AddLine(line, colours.ink[1], colours.ink[2], colours.ink[3], true) end
     GameTooltip:Show()
     if hover.graphs then update_graphs() end
 end
@@ -156,10 +159,33 @@ local function create_hover(block, region, title, lines, with_graphs, reputation
     return hover
 end
 
+local function render_points(value)
+    return BreakUpLargeNumbers and BreakUpLargeNumbers(value) or tostring(value)
+end
+
+local function read_reputation_tip()
+    local faction = vga.read_watched_reputation()
+    if not faction then return library.texts.reputation_short, {} end
+    local share = faction.most > 0 and math.min(faction.have / faction.most, 1) or 1
+    local standing = _G["FACTION_STANDING_LABEL" .. tostring(faction.reaction)] or ""
+    return faction.name, { string.format("%s · %d %%", standing, math.floor(share * 100)) }
+end
+
+local function read_experience_tip()
+    local have, most = UnitXP("player") or 0, UnitXPMax("player") or 0
+    return library.texts.experience, { string.format("%s / %s %s", render_points(have), render_points(most), library.texts.points) }
+end
+
+local function read_bar_tip(block)
+    if block.mode == "reputation" then return read_reputation_tip() end
+    return read_experience_tip()
+end
+
 local function create_hovers(block)
-    create_hover(block, block.level, "level", { "tip_level" }, false, { "reputation_short", "tip_reputation" })
+    create_hover(block, block.bar).read = read_bar_tip
+    create_hover(block, block.second).read = read_reputation_tip
+    create_hover(block, block.level, "level", { "tip_level", "tip_time" }, false, { "reputation_short", "tip_reputation" })
     create_hover(block, block.bonus, "tip_bonus_title", { "tip_bonus" }, false, { "faction", "tip_faction" })
-    create_hover(block, block.left, "xp_time", { "tip_time" })
     create_hover(block, block.system, "system_values", { "tip_fps", "tip_ms", "tip_mb", "tip_history" }, true)
     create_hover(block, block.money, "money", { "tip_money" })
     create_hover(block, block.slots, "bag_slots", { "tip_slots" })

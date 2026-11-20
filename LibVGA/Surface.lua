@@ -1,10 +1,22 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: LibVGA's rounded surfaces, drawn of a corner texture and three bands; notches, the inverse corners that round whatever lies beneath them; thin rings, a line with rounded corners and nothing inside, or bold ones whose corners round by twice their width ({K0413}); and the gold corner that opens an element's options.
+-- Scope: LibVGA's rounded surfaces, drawn of a corner texture and three bands; notches, the inverse corners that round whatever lies beneath them; thin rings, a line with rounded corners and nothing inside, or bold ones whose corners round by twice their width ({K0413}); and the gold corner that opens an element's options. A cell's picture - an action key's, a bag's, a menu button's - fills the cell up to its edge's inner side, its square corners under the edge's rounding (read_cell_inset, update_cell_picture; K0536, K0544).
 
--- {K0256} {K0267} {K0334} {K0346} {K0349} {K0413}
+-- {K0256} {K0267} {K0334} {K0346} {K0349} {K0413} {K0536} {K0544}
 
 local library = LibVGA
+local CELL_GAP = 0
+
+function library.read_cell_inset(edge)
+    return edge + CELL_GAP
+end
+
+function library.update_cell_picture(picture, cell, edge)
+    local inset = library.read_cell_inset(edge)
+    picture:ClearAllPoints()
+    picture:SetPoint("TOPLEFT", cell, "TOPLEFT", inset, -inset)
+    picture:SetPoint("BOTTOMRIGHT", cell, "BOTTOMRIGHT", -inset, inset)
+end
 
 function library.create_colour(colour, alpha)
     return CreateColor(colour[1], colour[2], colour[3], alpha or 1)

@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html): a quest whose objectives are all done shows its title alone, its struck objectives hidden unless the tab Quests says to show them; a quest with a time limit shows the time left on a small line under its title, the word first and the time after it, so only the line's end changes, green, yellow in the last two minutes, red in the last thirty seconds; a quest whose targets lie in a dungeon carries the game's word Dungeon after its title, quiet grey - by the game's quest tag, or by Questie's dungeon list for the quest's zone -; a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, at least 250 draft pixels, up to the most width chosen in the settings - Schmal 250, Mittel 320, Breit 384, the default; an objective longer than that is broken at its words onto further lines, the count on the first, a pixel between its lines, each line of a done one struck through as long as its words - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
+-- Scope: vga.ui's quest tracker as the accepted draft draws .qw (manual/view/vga-probe.html), at most half the screen's height, a longer list scrolling under its head (Questscroll.lua, K0548), its most height a slider's between a fifth and half the screen (K0550): a quest whose objectives are all done shows its title alone, its struck objectives hidden unless the tab Quests says to show them; a quest with a time limit shows the time left on a small line under its title, the word first and the time after it, so only the line's end changes, green, yellow in the last two minutes, red in the last thirty seconds; a quest whose targets lie in a dungeon carries the game's word Dungeon after its title, quiet grey - by the game's quest tag, or by Questie's dungeon list for the quest's zone -; a widget in the tooltip's look, at least as wide as the draft and wider where a title or objective needs it, at least 250 draft pixels, up to the most width set on the settings' slider, freely between 250 and 384, the default (K0550), a width chosen before as Schmal, Mittel or Breit kept as 250, 320 or 384; an objective longer than that is broken at its words onto further lines, the count on the first, a pixel between its lines, each line of a done one struck through as long as its words - growing towards the screen's middle: its place is kept by its outer corner - the upper right on the right half of the screen, the upper left on the left -, a place saved before by its upper left moved once to its upper right where it stands right -, the VGA mark, »Quests dieser Zone« in gold and the count shown of all in the log in its head; the watched quests whose next target lies in the player's zone, in the order the settings choose - the nearest first, by difficulty, the easiest first, or as watched in the quest log -, at most eight; each with its title in gold and its distance at the right, before the title a kept place for a mark - a green tick on a finished quest, a line arrow turned towards its target on an open one, gold on the nearest open, grey on the rest; its objectives with their counts, each after a small bead in exactly the game's colour of the quest's difficulty, a white light at its upper left and a faint shade at its lower right laid over it, centred under the arrow and on the middle of its line, its words set in where the title's begin, as the game colours it, a thin gold bar under each still open, the finished struck through; the data source at the foot; a left click on a quest opens it in the game's quest log, as Blizzard's tracker does, out of combat; a click on an open quest's arrow makes it the navigation's target instead of the nearest - a second click on the same arrow lets it go, a click on another's takes that one -, kept for each zone on its own: a quest chosen in one zone counts only there and counts again on returning; resting on the arrow explains this in a tooltip. The source is automatic - Questie when it is loaded and ready, else the game's own quest log -; Questie's internal modules are read guarded, the game's data standing where they fail. Blizzard's tracker and Questie's own are hidden while it runs.
 
 -- {K0260} {K0370} {K0371} {K0390} {K0401} {K0408} {K0422} {K0424}
 
@@ -20,7 +20,11 @@ local TICK = { 0.498, 0.816, 0.416 }
 local WIDTH = 300
 local MIN_WIDTH = 250
 local MOST_WIDTHS = { narrow = 250, middle = 320, wide = 384 }
-local WIDTH_KEYS = { "narrow", "middle", "wide" }
+local WIDTH_MOST = 384
+local WIDTH_STEP = 2
+local HEIGHT_LEAST = 0.2
+local HEIGHT_MOST = 0.5
+local HEIGHT_STEP = 0.01
 local TIME_GREEN = { 0.37, 0.82, 0.42 }
 local TIME_YELLOW = { 0.95, 0.79, 0.25 }
 local TIME_RED = { 0.93, 0.27, 0.22 }
@@ -84,7 +88,7 @@ local function update_pin_left()
 end
 
 local function create_quest()
-    local quest = CreateFrame("Frame", nil, tracker)
+    local quest = CreateFrame("Frame", nil, tracker.body.content)
     quest:EnableMouse(true)
     quest:SetScript("OnMouseUp", function(self, button) library.update_safely("quest opened", update_opened, self, button) end)
     quest.arrow = quest:CreateTexture(nil, "OVERLAY")
@@ -106,6 +110,53 @@ end
 
 local ORDERS = { "near", "difficulty", "journal" }
 
+local function write_zones(index)
+    library.update_choice_setting("quest_zones", index == 2 and "all" or "current")
+end
+
+local function read_stops(least, most, step)
+    local stops = {}
+    for value = least, most, step do stops[#stops + 1] = value end
+    if stops[#stops] ~= most then stops[#stops + 1] = most end
+    return stops
+end
+
+local function render_pixels(value)
+    return value .. " px"
+end
+
+function vga.read_quest_most_width()
+    local chosen = LibVGASettings.quest_most_width or MOST_WIDTHS[LibVGASettings.quest_width or "wide"] or WIDTH_MOST
+    return math.min(math.max(chosen, MIN_WIDTH), WIDTH_MOST)
+end
+
+function vga.read_quest_most_height()
+    return math.min(math.max(LibVGASettings.quest_most_height or HEIGHT_MOST, HEIGHT_LEAST), HEIGHT_MOST)
+end
+
+local function write_most_width(value)
+    LibVGASettings.quest_most_width = value
+    library.update_element("quests")
+end
+
+local function write_most_height(value)
+    LibVGASettings.quest_most_height = value
+    library.update_element("quests")
+end
+
+local function create_width_row(page, texts)
+    local row = library.create_row(page, texts.most_width)
+    row.control = library.create_slider(row, read_stops(MIN_WIDTH, WIDTH_MOST, WIDTH_STEP), vga.read_quest_most_width(), write_most_width)
+    row.control.render = render_pixels
+    return row
+end
+
+local function create_height_row(page, texts)
+    local row = library.create_row(page, texts.most_height)
+    row.control = library.create_slider(row, read_stops(HEIGHT_LEAST, HEIGHT_MOST, HEIGHT_STEP), vga.read_quest_most_height(), write_most_height)
+    return row
+end
+
 local function create_quests_page(page)
     local texts = library.texts
     local chosen = ({ near = 1, difficulty = 2, journal = 3 })[LibVGASettings.quest_order or "near"] or 1
@@ -116,9 +167,9 @@ local function create_quests_page(page)
         library.create_choice_row(page, texts.finished_quests, { texts.parts_hidden, texts.parts_shown }, LibVGASettings.quest_finished == "show" and 2 or 1, function(index)
             library.update_choice_setting("quest_finished", index == 1 and "hide" or "show")
         end),
-        library.create_choice_row(page, texts.most_width, { texts.narrow, texts.middle, texts.wide }, ({ narrow = 1, middle = 2, wide = 3 })[LibVGASettings.quest_width or "wide"] or 3, function(index)
-            library.update_choice_setting("quest_width", WIDTH_KEYS[index])
-        end),
+        library.create_choice_row(page, texts.quest_zones, { texts.current_zone, texts.all_zones }, vga.check_all_zones() and 2 or 1, write_zones),
+        create_width_row(page, texts),
+        create_height_row(page, texts),
     }
     for _, row in ipairs(library.create_widget_rows(page, "quests", { { key = "quests", title = texts.quest_tracker } })) do page.rows[#page.rows + 1] = row end
 end
@@ -147,6 +198,8 @@ local function create_tracker()
     tracker.source.text = library.create_text(tracker.source, "caption", SOURCE)
     tracker.source.text:SetPoint("CENTER")
     tracker.quests = {}
+    tracker.body = vga.create_quest_body(tracker)
+    tracker.body.content.top = 0
     tracker.measure = library.create_text(tracker, "body")
     tracker.measure:Hide()
     tracker.place_outer = true
@@ -230,12 +283,16 @@ local function read_game_quest(entry, points)
 end
 
 local function read_game_quests(map)
-    local points, watched, total = read_map_points(map), {}, 0
+    local points, watched, total, zone = read_map_points(map), {}, 0, nil
     for index = 1, C_QuestLog.GetNumQuestLogEntries() do
         local entry = C_QuestLog.GetInfo(index)
+        if entry and entry.isHeader then zone = entry.title end
         if entry and not entry.isHeader and entry.questID then
             total = total + 1
-            if C_QuestLog.GetQuestWatchType(entry.questID) ~= nil then watched[#watched + 1] = read_game_quest(entry, points) end
+            if C_QuestLog.GetQuestWatchType(entry.questID) ~= nil then
+                watched[#watched + 1] = read_game_quest(entry, points)
+                watched[#watched].zone = zone
+            end
         end
     end
     return watched, total
@@ -247,7 +304,10 @@ local function update_from_questie(quest, map)
     local spot, zone, _, distance = loader:ImportModule("DistanceUtils").GetNearestSpawnForQuest(found)
     if not spot then return end
     local zones = loader:ImportModule("ZoneDB")
-    quest.here = zones:GetUiMapIdByAreaId(zone) == map
+    local zone_map = zones:GetUiMapIdByAreaId(zone)
+    quest.here = zone_map == map
+    local zone_map_data = zone_map and C_Map.GetMapInfo(zone_map)
+    if zone_map_data and zone_map_data.name then quest.zone = zone_map_data.name end
     quest.dungeon = quest.dungeon or (found.zoneOrSort and found.zoneOrSort > 0 and zones:GetDungeonLocation(found.zoneOrSort) ~= nil)
     quest.point = { spot[1] / 100, spot[2] / 100 }
     quest.distance = distance
@@ -292,9 +352,10 @@ local function read_shown_quests(map, source)
     local shown = {}
     for _, quest in ipairs(watched) do
         if source == "questie" then library.update_safely("quests questie", update_from_questie, quest, map) end
-        if quest.here then shown[#shown + 1] = quest end
+        if quest.here or vga.check_all_zones() then shown[#shown + 1] = quest end
     end
     table.sort(shown, read_sorter())
+    if vga.check_all_zones() then return shown, total end
     for index = (LibVGASettings.quest_most or MOST) + 1, #shown do shown[index] = nil end
     return shown, total
 end
@@ -439,7 +500,7 @@ end
 local function update_quest(quest, data, top, width, active)
     local pad, arrow = read_draft(12), read_draft(12)
     quest:ClearAllPoints()
-    quest:SetPoint("TOPLEFT", tracker, "TOPLEFT", 0, -top)
+    quest:SetPoint("TOPLEFT", tracker.body.content, "TOPLEFT", 0, -(top - tracker.body.content.top))
     quest:SetWidth(width)
     quest.id = data.id
     quest.title:SetFontObject(library.read_frame_font("bold"))
@@ -473,7 +534,7 @@ local function update_head(width, shown, total)
     tracker.mark:ClearAllPoints()
     tracker.mark:SetPoint("TOPLEFT", tracker, "TOPLEFT", pad, -(read_draft(4) + read_draft(8)))
     tracker.head:SetFontObject(library.read_frame_font("bold"))
-    tracker.head:SetText(library.texts.quests_zone)
+    tracker.head:SetText(vga.check_all_zones() and library.texts.quests or library.texts.quests_zone)
     tracker.head:ClearAllPoints()
     tracker.head:SetPoint("LEFT", tracker.mark, "RIGHT", read_draft(8), 0)
     tracker.count:SetFontObject(library.read_frame_font("small"))
@@ -523,9 +584,47 @@ local function read_width(shown, total)
     local pad = read_draft(12)
     local head = 2 * pad + read_draft(16) + read_draft(8) + read_text_width(library.texts.quests_zone, "bold") + read_draft(16) + read_text_width(shown and (#shown .. " " .. library.texts.of .. " " .. total) or "", "small") + read_draft(14)
     local widest = math.max(read_draft(MIN_WIDTH), head)
-    local most = read_draft(MOST_WIDTHS[LibVGASettings.quest_width or "wide"] or MOST_WIDTHS.wide)
+    local most = read_draft(vga.read_quest_most_width())
     for _, data in ipairs(shown) do widest = math.max(widest, math.min(read_quest_width(data), most)) end
     return math.ceil(widest)
+end
+
+local function read_rows(shown, map)
+    if not vga.check_all_zones() then return shown, nil end
+    local here = map and C_Map.GetMapInfo(map)
+    local visible, rows, most = {}, {}, LibVGASettings.quest_most or MOST
+    for _, group in ipairs(vga.read_zone_groups(shown, here and here.name or "")) do
+        rows[#rows + 1] = { group = group }
+        if vga.check_zone_open(group) then
+            for _, quest in ipairs(group.quests) do
+                if #visible < most then
+                    visible[#visible + 1] = quest
+                    rows[#rows + 1] = { quest = quest }
+                end
+            end
+        end
+    end
+    return visible, rows
+end
+
+local function update_rows(rows, top, width, active)
+    local quest_index, label_index = 0, 0
+    tracker.labels = tracker.labels or {}
+    for _, row in ipairs(rows) do
+        if row.group then
+            label_index = label_index + 1
+            tracker.labels[label_index] = tracker.labels[label_index] or vga.create_zone_label(tracker.body.content)
+            top = top + vga.update_zone_label(tracker.labels[label_index], row.group, top, width)
+        else
+            quest_index = quest_index + 1
+            tracker.quests[quest_index] = tracker.quests[quest_index] or create_quest()
+            tracker.quests[quest_index]:Show()
+            top = top + update_quest(tracker.quests[quest_index], row.quest, top, width, row.quest == active)
+            tracker.quests[quest_index].line:SetShown(false)
+        end
+    end
+    for index = label_index + 1, #tracker.labels do tracker.labels[index]:Hide() end
+    return top, quest_index
 end
 
 local function update_tracker()
@@ -534,9 +633,12 @@ local function update_tracker()
     library.update_frame(tracker)
     local map = C_Map.GetBestMapForUnit("player")
     local source = read_source()
-    local shown, total = read_shown_quests(map, source)
+    local all, total = read_shown_quests(map, source)
+    local shown, rows = read_rows(all, map)
     local width = read_width(shown, total)
     local top = update_head(width, #shown, total)
+    local head = top
+    tracker.body.content.top = head
     tracker.map = map
     local pinned = map and LibVGASettings.quest_pins and LibVGASettings.quest_pins[map]
     local active
@@ -546,14 +648,21 @@ local function update_tracker()
     for _, data in ipairs(shown) do
         if data.id == pinned and not data.complete and data.point then active = data end
     end
-    for index, data in ipairs(shown) do
-        tracker.quests[index] = tracker.quests[index] or create_quest()
-        tracker.quests[index]:Show()
-        top = top + update_quest(tracker.quests[index], data, top, width, data == active)
-        tracker.quests[index].line:SetShown(index < #shown)
+    if rows then
+        top = update_rows(rows, top, width, active)
+    else
+        for index, data in ipairs(shown) do
+            tracker.quests[index] = tracker.quests[index] or create_quest()
+            tracker.quests[index]:Show()
+            top = top + update_quest(tracker.quests[index], data, top, width, data == active)
+            tracker.quests[index].line:SetShown(index < #shown)
+        end
+        for _, label in ipairs(tracker.labels or {}) do label:Hide() end
     end
     for index = #shown + 1, #tracker.quests do tracker.quests[index]:Hide() end
-    tracker:SetSize(width, update_foot(top, source))
+    local foot = update_foot(head, source) - head
+    local room = vga.update_quest_body(tracker, head, top - head, width, foot)
+    tracker:SetSize(width, update_foot(head + room, source))
     vga.quest_aim = active or nil
     vga.update_quest_items(tracker, tracker.quests, shown)
     update_arrows()
@@ -562,6 +671,8 @@ end
 local function update_tracker_safely()
     library.update_safely("quests", update_tracker)
 end
+
+vga.update_quest_tracker = update_tracker_safely
 
 local function update_arrow_safely(_, elapsed)
     tracker.since = (tracker.since or 0) + elapsed

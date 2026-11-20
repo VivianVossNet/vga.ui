@@ -1,10 +1,12 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's cast bar under the player frame and, mirrored, under the target frame, as manual/view/vga-cast.html draws way C: a thin gold bar the frame's width, the spell's name small beneath it, fixed to the frame's portrait side - left under the player, right under the mirrored target - and its time quiet at the other; its room kept always, seen only while a spell is cast; Blizzard's own cast bar hidden.
+-- Scope: vga.ui's cast bar under the player frame and, mirrored, under the target frame, as manual/view/vga-cast.html draws way C: a thin gold bar the frame's width, the spell's name small beneath it - none where the game gives an empty name or a placeholder such as »Opening - No Text« -, fixed to the frame's portrait side - left under the player, right under the mirrored target - and its time quiet at the other; its room kept always, seen only while a spell is cast; Blizzard's own cast bar hidden.
 
--- {K0267} {K0331} {K0334} {K0331}
+-- {K0267} {K0331} {K0334} {K0527}
 
+local _, vga = ...
 local library = LibVGA
+local NO_TEXT = "no text"
 local colours = library.colours
 local casts = {}
 
@@ -76,6 +78,12 @@ local function update_cast_timer(cast)
     end
 end
 
+function vga.read_cast_label(name)
+    if issecretvalue and issecretvalue(name) then return name end
+    if type(name) ~= "string" or name:match("^%s*$") or name:lower():find(NO_TEXT, 1, true) then return "" end
+    return name
+end
+
 local function update_cast(cast)
     local unit = cast.unit
     if not cast.anchored then update_cast_layout(cast) end
@@ -90,7 +98,7 @@ local function update_cast(cast)
         cast.bar:SetScript("OnUpdate", nil)
         return
     end
-    cast.name:SetText(name)
+    cast.name:SetText(vga.read_cast_label(name))
     if issecretvalue and (issecretvalue(start) or issecretvalue(finish)) then
         update_cast_timer(cast)
         return

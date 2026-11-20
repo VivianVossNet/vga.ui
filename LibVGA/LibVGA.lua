@@ -44,6 +44,8 @@ library.colours = {
     gold = { 0.894, 0.718, 0.314 },
     gold_high = { 0.965, 0.863, 0.557 },
     gold_low = { 0.612, 0.455, 0.141 },
+    orange = { 0.976, 0.565, 0.188 },
+    orange_low = { 0.6, 0.29, 0.063 },
     edge = { 0.173, 0.184, 0.208 },
 }
 
@@ -171,6 +173,11 @@ function library.update_safely(name, work, ...)
         LibVGASettings.faults[name] = held
     end
     return ok
+end
+
+function library.update_element(key)
+    local element = library.elements[key]
+    if element and element.update then library.update_safely("update " .. key, element.update) end
 end
 
 function library.update_elements()

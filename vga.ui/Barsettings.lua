@@ -94,7 +94,7 @@ end
 local function write_ground(value)
     LibVGASettings.grounds[read_ground_key(page.selected)] = value
     page.ground.control.like = nil
-    library.update_elements()
+    library.update_grounds()
 end
 
 local function update_ground_reset(control)
@@ -120,6 +120,25 @@ local function write_count(index)
     update_bar_rows()
 end
 
+local END_KINDS = { "gryphon", "dragon", "wolf", "bear" }
+
+local function read_end_index(key)
+    for index, kind in ipairs(END_KINDS) do
+        if LibVGASettings[key] == kind then return index end
+    end
+    return 1
+end
+
+local function create_end_row(texts, title, key)
+    return library.create_choice_row(page, title, { texts.gryphon, texts.dragon, texts.wolf, texts.bear }, read_end_index(key), function(index)
+        library.update_choice_setting(key, END_KINDS[index])
+    end)
+end
+
+local function write_menu_icons(index)
+    library.update_choice_setting("menu_icons", index == 2 and "ours" or "game")
+end
+
 local function create_form_rows(texts)
     local labels, pictures = { texts.one_row, texts.two_rows, texts.free }, {}
     for index, rects in ipairs(FORM_PICTURES) do pictures[index] = { box = FORM_BOX, rects = rects, label = labels[index] } end
@@ -127,9 +146,12 @@ local function create_form_rows(texts)
     form.control = library.create_pictures(form, pictures, read_form_index(), write_form, "tile")
     page.count = library.create_choice_row(page, texts.bars, { texts.count_two, texts.count_three }, LibVGASettings.mainbar_count == "two" and 1 or 2, write_count)
     page.count:SetShown(read_form_index() == 1)
+    page.end_left = create_end_row(texts, texts.end_left, "bar_end_left")
+    page.end_right = create_end_row(texts, texts.end_right, "bar_end_right")
+    page.menu_icons = library.create_choice_row(page, texts.menu_icons, { texts.game_pictures, texts.vga_icons }, LibVGASettings.menu_icons == "ours" and 2 or 1, write_menu_icons)
     local heading = library.create_row(page, texts.form, "heading")
-    heading.members = { form, page.count }
-    return { heading, form, page.count }
+    heading.members = { form, page.count, page.end_left, page.end_right, page.menu_icons }
+    return { heading, form, page.count, page.end_left, page.end_right, page.menu_icons }
 end
 
 local function create_bar_rows(texts)
@@ -143,6 +165,7 @@ local function create_bar_rows(texts)
     page.size = library.create_choice_row(page, texts.size, { texts.small, texts.medium, texts.large }, 2, write_size)
     page.ground = library.create_row(page, texts.background)
     page.ground.control = library.create_slider(page.ground, library.ground_stops, library.read_ground(), write_ground)
+    page.ground.control.on_settle = library.update_elements
     page.ground.control:HookScript("OnMouseUp", update_ground_reset)
     page.bar_heading = library.create_row(page, "", "heading")
     page.bar_heading.members = { page.show, page.keys, page.size, page.ground }

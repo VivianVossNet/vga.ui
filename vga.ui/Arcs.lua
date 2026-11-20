@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: Two transparent arcs either side of the character, wide enough to clear it and centred on its middle, as manual/view/vga-hud.html draws them (D): twelve segments each, lit one by one; an arc with nothing to show fades slowly out, each on its own, and back in when it has. Each side shows what the settings choose - the range, the threat, the target's cast or its health, the player's own resource, named as the game names the class's power - Mana, Wut, Energie, for a druid all three -, filling the arc in the power bar's colour, with or without a target, a rogue's or cat's combo points as five beads beside it, lit gold when earned -, or nothing -, by default the range at the left and the threat at the right. The range to an attackable target filling from its foot as the target comes nearer - the distance known in steps by the game's own range checks - the player's harmful spells and a few items, each at the range the game gives its spell, and the interact distances of 10 and 28 yards -, shown as the smallest step the target stands within, »>« before the largest when beyond it -, its lit segments in one colour that tells the reach - red when the target stands near, through orange and yellow to a deep green at the edge of the best range of the player's class, by the steps' yards -; every segment grey where it stands beyond that range or beyond every step; the threat drawn from the target fills in the threat meter's five colours, the health in green, each segment set by the game from the value even where it is secret; the target's cast fills as it runs, gold while it can be interrupted, grey while not, its spell's name at the head - for the moment to interrupt. Each arc's value stands at its head or its foot, or not at all, as the settings say. Free to be placed while arranging.
+-- Scope: Two transparent arcs either side of the character, wide enough to clear it and centred on its middle, as manual/view/vga-hud.html draws them (D): twelve segments each, lit one by one - or, as the settings say (arc_shape), half arcs, half as high, of six segments for the same values, the beads closer together -; an arc with nothing to show fades slowly out, each on its own, and back in when it has. Each side shows what the settings choose - the range, the threat, the target's cast or its health, the player's own health - filled in green as the target's, with or without a target -, the player's own resource, named as the game names the class's power - Mana, Wut, Energie, for a druid all three -, filling the arc in the power bar's colour, with or without a target, a rogue's or cat's combo points as five beads beside it, lit in VGA's orange when earned -, or nothing -, by default the range at the left and the threat at the right. The range to an attackable target filling from its foot as the target comes nearer - the distance known in steps by the game's own range checks - the player's harmful spells and a few items, each at the range the game gives its spell, and the interact distances of 10 and 28 yards -, shown as the smallest step the target stands within, »>« before the largest when beyond it -, its lit segments in one colour that tells the reach - red when the target stands near, through orange and yellow to a deep green at the edge of the best range of the player's class, by the steps' yards -; every segment grey where it stands beyond that range or beyond every step; the threat drawn from the target fills in the threat meter's five colours, the health in green, each segment set by the game from the value even where it is secret; the target's cast fills as it runs, gold while it can be interrupted, grey while not, its spell's name at the head - for the moment to interrupt. Each arc's value stands at its head or its foot, or not at all, as the settings say. Free to be placed while arranging.
 
--- {K0392} {K0393} {K0395} {K0400} {K0416} {K0417} {K0418}
+-- {K0392} {K0393} {K0395} {K0400} {K0416} {K0417} {K0418} {K0501} {K0502}
 
 local _, vga = ...
 local library = LibVGA
@@ -60,6 +60,14 @@ local function update_fade(side, elapsed)
     side:SetAlpha(side.wanted > alpha and math.min(side.wanted, alpha + step) or math.max(side.wanted, alpha - step))
 end
 
+local function read_count()
+    return LibVGASettings.arc_shape == "half" and SEGMENTS / 2 or SEGMENTS
+end
+
+local function read_span()
+    return LibVGASettings.arc_shape == "half" and SPAN / 2 or SPAN
+end
+
 local function create_side(mirror)
     local side = CreateFrame("Frame", nil, arcs)
     side:SetAllPoints(arcs)
@@ -75,9 +83,11 @@ end
 
 local function update_side_layout(side)
     local radius, size = read_draft(RADIUS), read_draft(16)
+    local count, span = read_count(), read_span()
     for index, segment in ipairs(side.segments) do
-        local share = (index - 0.5) / SEGMENTS
-        local angle = math.rad(-SPAN / 2 + share * SPAN)
+        local share = (index - 0.5) / count
+        local angle = math.rad(-span / 2 + share * span)
+        segment:SetShown(index <= count)
         segment:SetSize(size, size)
         segment:ClearAllPoints()
         segment:SetPoint("CENTER", arcs, "CENTER", side.mirror * radius * math.cos(angle), radius * math.sin(angle))
@@ -86,7 +96,7 @@ local function update_side_layout(side)
         segment.track:SetRotation(turn)
     end
     local foot = LibVGASettings.arc_values == "bottom"
-    local head = math.rad(foot and -SPAN / 2 or SPAN / 2)
+    local head = math.rad((foot and -1 or 1) * read_span() / 2)
     side.value:SetFontObject(library.read_font("small"))
     side.value:ClearAllPoints()
     side.value:SetPoint(foot and "TOP" or "BOTTOM", arcs, "CENTER", side.mirror * radius * math.cos(head), radius * math.sin(head) + (foot and -1 or 1) * read_draft(10))
@@ -161,9 +171,9 @@ local function update_range(side)
     local yards, foe = read_range(), UnitCanAttack("player", "target")
     side.wanted = (yards or foe) and 1 or 0
     local share = yards and (RANGE_MOST - yards) / RANGE_MOST or 0
-    local lit, best = math.max(foe and 1 or 0, math.ceil(share * SEGMENTS)), yards and check_best_range()
+    local lit, best = math.max(foe and 1 or 0, math.ceil(share * read_count())), yards and check_best_range()
     local colour = read_range_colour(yards, read_best_yards(), best)
-    if colour == OUT_OF_REACH then lit = SEGMENTS end
+    if colour == OUT_OF_REACH then lit = read_count() end
     for index, segment in ipairs(side.segments) do
         segment:SetStatusBarColor(colour[1], colour[2], colour[3], 0.9)
         segment:SetMinMaxValues(0, STEP)
@@ -177,14 +187,14 @@ local function update_by_game(side, share, colour_of)
     for index, segment in ipairs(side.segments) do
         local colour = colour_of(index)
         segment:SetStatusBarColor(colour[1], colour[2], colour[3], 0.9)
-        segment:SetMinMaxValues((index - 1) * 100 / SEGMENTS, (index - 1) * 100 / SEGMENTS + STEP)
+        segment:SetMinMaxValues((index - 1) * 100 / read_count(), (index - 1) * 100 / read_count() + STEP)
         segment:SetValue(share or 0)
     end
     pcall(side.value.SetFormattedText, side.value, "%d %%", share or 0)
 end
 
 local function read_threat_colour(index)
-    return library.colours.steps[math.min(5, math.floor((index - 1) / SEGMENTS * 5) + 1)]
+    return library.colours.steps[math.min(5, math.floor((index - 1) / read_count() * 5) + 1)]
 end
 
 local function update_threat(side)
@@ -204,6 +214,12 @@ local function update_health(side)
     update_by_game(side, share, read_health_colour)
 end
 
+local function update_own_health(side)
+    side.wanted = 1
+    local share = UnitHealthPercent and CurveConstants and UnitHealthPercent("player", true, CurveConstants.ScaleTo100)
+    update_by_game(side, share, read_health_colour)
+end
+
 local function read_cast_share(start, finish, channel)
     local now = GetTime() * 1000
     local share = (now - start) / math.max(finish - start, 1)
@@ -220,24 +236,25 @@ local function update_cast(side)
     side.wanted = name and 1 or 0
     if not name then return end
     local ran, share = pcall(read_cast_share, start, finish, channel)
-    local lit = math.ceil((ran and share or 1) * SEGMENTS)
+    local lit = math.ceil((ran and share or 1) * read_count())
     local colour = locked and GREY or library.colours.gold
     for index, segment in ipairs(side.segments) do
         segment:SetStatusBarColor(colour[1], colour[2], colour[3], 0.9)
         segment:SetMinMaxValues(0, STEP)
         segment:SetValue(index <= lit and STEP or 0)
     end
-    side.value:SetText(name)
+    side.value:SetText(vga.read_cast_label(name))
 end
 
 local function update_marks(side, shown)
-    local points = shown and vga.read_combo_points() or nil
+    local points, held
+    if shown then points, held = vga.read_combo_points() end
     local radius, size = read_draft(RADIUS + 14), read_draft(7)
     side.marks = side.marks or {}
     for index = 1, COMBO_MARKS do
         side.marks[index] = side.marks[index] or library.create_bead(side, "OVERLAY", 3)
-        local bead, angle = side.marks[index], math.rad(-SPAN / 2 + (index - 0.5) / COMBO_MARKS * SPAN)
-        local colour = points and index <= points and library.colours.gold or MARK_OPEN
+        local bead, angle = side.marks[index], math.rad(-read_span() / 2 + (index - 0.5) / COMBO_MARKS * read_span())
+        local colour = points and index <= points and library.colours.orange or held and index <= held and library.colours.orange_low or MARK_OPEN
         bead:SetSize(size, size)
         bead:SetVertexColor(colour[1], colour[2], colour[3], 1)
         bead:ClearAllPoints()
@@ -261,7 +278,7 @@ local function update_resource(side)
     update_marks(side, true)
 end
 
-local SHOWS = { range = update_range, threat = update_threat, cast = update_cast, health = update_health, resource = update_resource }
+local SHOWS = { range = update_range, threat = update_threat, cast = update_cast, health = update_health, resource = update_resource, own_health = update_own_health }
 
 local function check_target()
     return UnitExists("target") and UnitCanAttack("player", "target") and not UnitIsDead("target")
@@ -280,8 +297,8 @@ local function update_values()
         side:SetShown(show ~= nil)
         side.value:SetShown(LibVGASettings.arc_values ~= "off")
         if side.marks and show ~= "resource" then update_marks(side, false) end
-        if show == "resource" then
-            update_resource(side)
+        if show == "resource" or show == "own_health" then
+            SHOWS[show](side)
         elseif not target then
             side.wanted = 0
         elseif show then
@@ -308,7 +325,7 @@ end
 
 local function read_kinds()
     local texts = library.texts
-    return { "range", "threat", "cast", "health", "resource", "off" }, { texts.range_arc, texts.threat_arc, texts.cast_arc, texts.health_arc, read_resource_name(), texts.off }
+    return { "range", "threat", "cast", "health", "own_health", "resource", "off" }, { texts.range_arc, texts.threat_arc, texts.cast_arc, texts.health_arc, texts.own_health_arc, read_resource_name(), texts.off }
 end
 local PLACES = { "top", "bottom", "off" }
 
@@ -326,6 +343,10 @@ local function create_side_row(page, label, key, fallback)
     end)
 end
 
+local function write_arc_shape(index)
+    library.update_choice_setting("arc_shape", index == 2 and "half" or "full")
+end
+
 local function create_arcs_page(page)
     local texts = library.texts
     page.rows = {
@@ -333,7 +354,7 @@ local function create_arcs_page(page)
         create_side_row(page, texts.right_arc, "arc_right", "threat"),
         library.create_choice_row(page, texts.values_shown, { texts.top, texts.bottom, texts.off }, read_place(PLACES, LibVGASettings.arc_values, "top"), function(index)
             library.update_choice_setting("arc_values", PLACES[index])
-        end),
+        end),        library.create_choice_row(page, texts.arc_shape, { texts.full_arc, texts.half_arc }, LibVGASettings.arc_shape == "half" and 2 or 1, write_arc_shape),
     }
 end
 

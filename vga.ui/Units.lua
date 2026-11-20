@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's player frame, target frame and pet frame, each where Blizzard's own stands in the player's layout: the level's shield, the name and its class or kind, health and power, the target mirrored to the player, the portrait's rim one smooth, rounded frame in one colour over the picture, its corners and sides cut from one texture - seven outside, three thick, four inside -, clicked to target; Blizzard's own frames hidden.
+-- Scope: vga.ui's player frame, target frame and pet frame, each where Blizzard's own stands in the player's layout: the level's shield, the name and its class or kind, health and power, the target mirrored to the player, the portrait's rim one smooth, rounded frame in one colour over the picture, its corners and sides cut from one texture - seven outside, three thick, four inside -, clicked to target; Blizzard's own frames hidden. In a resting place - an inn, a city - the same pulse round the player's portrait glows blue instead of red; in a fight the red wins and the blue rests until the fight is over (K0551).
 
--- {K0481} {K0267} {K0268} {K0275} {K0276} {K0294} {K0297} {K0299} {K0300} {K0302} {K0329} {K0330} {K0334} {K0342} {K0345} {K0346} {K0360}
+-- {K0481} {K0551} {K0267} {K0268} {K0275} {K0276} {K0294} {K0297} {K0299} {K0300} {K0302} {K0329} {K0330} {K0334} {K0342} {K0345} {K0346} {K0360}
 
 local _, vga = ...
 local library = LibVGA
@@ -23,6 +23,7 @@ local BADGE_TEXT = { 0.945, 0.812, 0.431 }
 local POWERS = { [0] = "power", [1] = "rage", [2] = "focus", [3] = "energy", [6] = "runic" }
 local frames = {}
 local FIGHT = { 0.86, 0.12, 0.1 }
+local RESTING = { 0.2, 0.5, 0.95 }
 local FIGHT_LOW = 0.2
 local FIGHT_HIGH = 0.75
 local FIGHT_PULSE = 1.4
@@ -202,9 +203,12 @@ local function update_fight_glow()
     local glow = frames.player and frames.player.fight
     if not glow then return end
     local fighting = UnitAffectingCombat("player") and true or false
-    glow:SetShown(fighting)
-    if fighting and not glow.pulse:IsPlaying() then glow.pulse:Play() end
-    if not fighting then glow.pulse:Stop() end
+    local resting = not fighting and IsResting and IsResting() and true or false
+    local colour = fighting and FIGHT or RESTING
+    glow:SetVertexColor(colour[1], colour[2], colour[3], 1)
+    glow:SetShown(fighting or resting)
+    if (fighting or resting) and not glow.pulse:IsPlaying() then glow.pulse:Play() end
+    if not (fighting or resting) then glow.pulse:Stop() end
 end
 
 local function create_frame(unit, mirrored)
@@ -398,12 +402,12 @@ local function update_event(event, unit)
         library.create_place(pet, "pet", "TOPRIGHT", player, 0, -(library.read_cast_room() + 2 * library.read_size(-4)), "BOTTOMRIGHT")
         delete_blizzard_frames()
         library.create_element("units", { title = UNITFRAME_LABEL or "Units", update = update_units })
-        for _, name in ipairs({ "PLAYER_TARGET_CHANGED", "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_LEVEL", "UNIT_NAME_UPDATE", "UNIT_PORTRAIT_UPDATE", "UNIT_CLASSIFICATION_CHANGED", "PLAYER_ENTERING_WORLD", "UNIT_PET", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "UNIT_MODEL_CHANGED", "QUEST_LOG_UPDATE", "UNIT_QUEST_LOG_CHANGED", "COMBAT_TEXT_UPDATE" }) do
+        for _, name in ipairs({ "PLAYER_TARGET_CHANGED", "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_LEVEL", "UNIT_NAME_UPDATE", "UNIT_PORTRAIT_UPDATE", "UNIT_CLASSIFICATION_CHANGED", "PLAYER_ENTERING_WORLD", "UNIT_PET", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED", "UNIT_MODEL_CHANGED", "QUEST_LOG_UPDATE", "UNIT_QUEST_LOG_CHANGED", "COMBAT_TEXT_UPDATE", "PLAYER_UPDATE_RESTING" }) do
             pcall(events.RegisterEvent, events, name)
         end
         update_units()
         C_Timer.After(1, function() library.update_safely("units portrait", update_units) end)
-    elseif event == "PLAYER_REGEN_DISABLED" then
+    elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_UPDATE_RESTING" then
         update_fight_glow()
     elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_ENTERING_WORLD" or event == "UNIT_PET" or event == "PLAYER_REGEN_ENABLED" or event == "QUEST_LOG_UPDATE" or event == "UNIT_QUEST_LOG_CHANGED" then
         update_fight_glow()

@@ -1,13 +1,21 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: vga.ui's own action bars as manual/view/vga-mainbar.html draws them, each key edged as the bags' slots - three pixels with gently rounded corners in the slot's grey, laid over the icon: eight bars of twelve protected keys of our own, on Blizzard's own pages - the main bar on the player's action slots, turning its page with stance, form, vehicle and override as Blizzard's does, the second on page 6, the third on 5, the fourth and fifth on 3 and 4, Blizzard's right bars, the sixth to eighth on 13 to 15 -, bound to the player's own keys, each shown or hidden as the settings say, bars 4 to 8 at first as the player had them in Blizzard's settings; two rows by default, the second and third bar side by side above the main bar, the second at the left, or all in one row, as the settings' »Leisten« page says, the bottom row centred on the screen whole; in one row two or three bars as the settings say, three by default, in two rows always three; the whole element - bars, game menu, bag bar and gryphons - scaled down as far as needed for the gryphons' outer ends to fit the screen's width, the widget itself never scaled but drawn around them at whole pixels, so its pieces show no seams; the game menu and the bag bar beside them; behind them one widget in the tooltip's look with its gold corner, the experience bar of Experience.lua between the rows; the keys dressed as the draft's .key; the game's own gryphons drawn at both ends. Bars 4 to 8 always stand free, each in a widget of its own. In the third form, »lose«, the gryphons and the shared widget go: each bar, the game menu, the bag bar and the experience bar stands in a widget of its own, with its own ground and gold corner, moved in the edit mode, at first scattered over the screen so that arranging them is plainly the next step; each free bar stacks its keys 1, 2, 3, 4, 6 or 12 to a row and each area is drawn small, normal or large - 80, 100 or 125 per cent - as the »Leisten« page says, which Barsettings.lua draws. Blizzard's eight bars and experience bars are put away in a hidden frame and put back there whenever Blizzard's managed layout takes them out again; nothing protected is moved in a fight. The game's range dot, which an unbound key shows in its key's corner, is drawn in the game's Arial Narrow, since our faces lack the glyph; the bars are laid anew when the game's Edit Mode layouts arrive, late on a character's first login.
+-- Scope: vga.ui's own action bars as manual/view/vga-mainbar.html draws them, each key edged as the bags' slots - three pixels with gently rounded corners in the slot's grey, laid over the icon: eight bars of twelve protected keys of our own, on Blizzard's own pages - the main bar on the player's action slots, turning its page with stance, form, vehicle and override as Blizzard's does - a stance's or stealth's page only while the player's own page is the first, so sub-bar B can be chosen in any stance (K0534) -, the second on page 6, the third on 5, the fourth and fifth on 3 and 4, Blizzard's right bars, the sixth to eighth on 13 to 15 -, bound to the player's own keys, each shown or hidden as the settings say, bars 4 to 8 at first as the player had them in Blizzard's settings; two rows by default, the second and third bar side by side above the main bar, the second at the left, the upper row always centred on the screen's middle as the lower row is, whatever the lower row's parts weigh (K0535), or all in one row, as the settings' »Leisten« page says, the bottom row centred on the screen whole; in one row two or three bars as the settings say, three by default, in two rows always three; the whole element - bars, game menu, bag bar and gryphons - scaled down as far as needed for the gryphons' outer ends to fit the screen's width, the widget itself never scaled but drawn around them at whole pixels, so its pieces show no seams; the game menu and the bag bar beside them; behind them one widget in the tooltip's look with its gold corner, the experience bar of Experience.lua between the rows; the keys dressed as the draft's .key; the game's own gryphons drawn at both ends. Bars 4 to 8 always stand free, each in a widget of its own. In the third form, »lose«, the gryphons and the shared widget go: each bar, the game menu, the bag bar and the experience bar stands in a widget of its own, with its own ground and gold corner, moved in the edit mode, at first scattered over the screen so that arranging them is plainly the next step; each free bar stacks its keys 1, 2, 3, 4, 6 or 12 to a row and each area is drawn small, normal or large - 80, 100 or 125 per cent - as the »Leisten« page says, which Barsettings.lua draws. Blizzard's eight bars and experience bars are put away in a hidden frame and put back there whenever Blizzard's managed layout takes them out again; nothing protected is moved in a fight. The game's range dot, which an unbound key shows in its key's corner, is drawn in the game's Arial Narrow, since our faces lack the glyph; the bars are laid anew when the game's Edit Mode layouts arrive, late on a character's first login.
 
--- {K0375} {K0376} {K0377} {K0380} {K0382} {K0384} {K0385} {K0419} {K0482}
+-- {K0375} {K0376} {K0377} {K0380} {K0382} {K0384} {K0385} {K0419} {K0482} {K0503} {K0506}
 
 local _, vga = ...
 local library = LibVGA
 local DRAFT_BASE = 13
 local KEYS = 12
+local END_FIGURES = {
+    dragon = { file = "EndDragon", width = 89, height = 123, overlap = 20 },
+    wolf = { file = "EndWolf", width = 93, height = 128, overlap = 26 },
+    bear = { file = "EndBear", width = 107, height = 128, overlap = 26 },
+}
+local END_CANVAS = 128
+local END_DRAFT = 105
+local END_FOOT = 15
 local BARS = {
     { name = "VGAActionBar", page = 1, command = "ACTIONBUTTON" },
     { name = "VGASecondBar", page = 6, command = "MULTIACTIONBAR1BUTTON", blizzard = "MultiBarBottomLeft" },
@@ -23,7 +31,7 @@ local ALWAYS_FREE = 4
 local BLACK = { 0, 0, 0 }
 local EDGE_WIDTH = 3
 local SLOT_EDGE = { 0.18, 0.192, 0.22 }
-local PAGES = "[vehicleui][possessbar] 12; [overridebar] 14; [shapeshift] 13; [bonusbar:5] 11; [bonusbar:4] 10; [bonusbar:3] 9; [bonusbar:2] 8; [bonusbar:1] 7; [bar:2] 2; [bar:3] 3; [bar:4] 4; [bar:5] 5; [bar:6] 6; 1"
+local PAGES = "[vehicleui][possessbar] 12; [overridebar] 14; [shapeshift] 13; [bar:2] 2; [bar:3] 3; [bar:4] 4; [bar:5] 5; [bar:6] 6; [bonusbar:5] 11; [bonusbar:4] 10; [bonusbar:3] 9; [bonusbar:2] 8; [bonusbar:1] 7; 1"
 local TURN_PAGE = [[
     for index = 1, 12 do
         self:GetFrameRef("key" .. index):SetAttribute("actionpage", newstate)
@@ -108,9 +116,12 @@ local function create_key(bar, name, index, command)
         if part then part:SetAlpha(0) end
     end
     if key.icon and key.IconMask then key.icon:RemoveMaskTexture(key.IconMask) end
-    if key.icon then key.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+    if key.icon then
+        key.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        library.update_cell_picture(key.icon, key, EDGE_WIDTH)
+    end
+    if key.cooldown then library.update_cell_picture(key.cooldown, key, EDGE_WIDTH) end
     key.vga_line = library.create_surface(key, "BACKGROUND", -8)
-    key.vga_notches = library.create_notches(key, "OVERLAY", 7)
     key.vga_edge = library.create_ring(key, "OVERLAY", 6, nil, true)
     library.create_shimmer(key)
     library.delete_shimmer(key)
@@ -139,7 +150,6 @@ local function update_key_look(key, size, across, down)
     key:ClearAllPoints()
     key:SetPoint("TOPLEFT", key:GetParent(), "TOPLEFT", across, -down)
     library.update_surface(key.vga_line, -1, radius + 1, BLACK, BLACK)
-    library.update_notches(key.vga_notches, key, radius, BLACK)
     library.update_ring(key.vga_edge, EDGE_WIDTH, SLOT_EDGE, 1)
     if key.HotKey then
         update_hotkey_face(key.HotKey, key.HotKey:GetText())
@@ -196,29 +206,31 @@ end
 
 local function read_row_shift(two, gap)
     local bar = mainbar.first_bar:GetWidth()
-    local micro, bags = read_width(MicroMenuContainer), read_width(BagsBar)
+    local micro, bags = read_width(vga.game_menu), read_width(vga.bag_row)
     local count = two and 1 or (read_three() and 3 or 2)
     local bars = count * bar + (count - 1) * gap
-    local total = micro + gap + bars + gap + bags
+    local total = micro + gap + bars + vga.read_page_switch_reach() + gap + bags
     return -total / 2 + micro + gap + bar / 2
 end
 
 local function update_rows()
     local first, second, third = mainbar.first_bar, mainbar.second_bar, mainbar.third_bar
     local two, gap = not read_one_row(), read_draft(14)
+    vga.update_page_switch(first)
+    local shift = read_row_shift(two, gap)
     first:ClearAllPoints()
-    first:SetPoint("BOTTOM", UIParent, "BOTTOM", read_row_shift(two, gap), gap)
+    first:SetPoint("BOTTOM", UIParent, "BOTTOM", shift, gap)
     second:ClearAllPoints()
     third:ClearAllPoints()
     local above = (vga.read_experience_height() + 2 * read_draft(5)) / first:GetScale()
     third:SetShown(read_three())
     if two and read_three() then
-        second:SetPoint("BOTTOMRIGHT", first, "TOP", -gap / 2, above)
+        second:SetPoint("BOTTOMRIGHT", first, "TOP", -gap / 2 - shift, above)
         third:SetPoint("LEFT", second, "RIGHT", gap, 0)
     elseif two then
-        second:SetPoint("BOTTOM", first, "TOP", 0, above)
+        second:SetPoint("BOTTOM", first, "TOP", -shift, above)
     else
-        second:SetPoint("LEFT", first, "RIGHT", gap, 0)
+        second:SetPoint("LEFT", first, "RIGHT", gap + vga.read_page_switch_reach(), 0)
         third:SetPoint("LEFT", second, "RIGHT", gap, 0)
     end
     return two
@@ -227,13 +239,13 @@ end
 local function update_sides()
     local first = mainbar.first_bar
     local last = read_one_row() and (read_three() and mainbar.third_bar or mainbar.second_bar) or first
-    if MicroMenuContainer then
-        MicroMenuContainer:ClearAllPoints()
-        MicroMenuContainer:SetPoint("RIGHT", first, "LEFT", -read_draft(14), 0)
+    if vga.game_menu then
+        vga.game_menu:ClearAllPoints()
+        vga.game_menu:SetPoint("RIGHT", first, "LEFT", -read_draft(14), 0)
     end
-    if BagsBar then
-        BagsBar:ClearAllPoints()
-        BagsBar:SetPoint("LEFT", last, "RIGHT", read_draft(14), 0)
+    if vga.bag_row then
+        vga.bag_row:ClearAllPoints()
+        vga.bag_row:SetPoint("LEFT", last == first and vga.page_switch or last, "RIGHT", read_draft(14), 0)
     end
     return last
 end
@@ -250,8 +262,8 @@ end
 local function update_widget(two, last)
     local pad = read_draft(8)
     local first = mainbar.first_bar
-    local left = read_outer(MicroMenuContainer, two and mainbar.second_bar or first, "LEFT")
-    local right = read_outer(BagsBar, two and (read_three() and mainbar.third_bar or mainbar.second_bar) or last, "RIGHT")
+    local left = read_outer(vga.game_menu, two and mainbar.second_bar or first, "LEFT")
+    local right = read_outer(vga.bag_row, two and (read_three() and mainbar.third_bar or mainbar.second_bar) or last, "RIGHT")
     mainbar:ClearAllPoints()
     mainbar:SetPoint("LEFT", left, "LEFT", -pad, 0)
     mainbar:SetPoint("RIGHT", right, "RIGHT", pad, 0)
@@ -270,26 +282,45 @@ local function update_experience()
     vga.update_experience(block)
 end
 
+local function update_end_art(holder, side)
+    local figure = END_FIGURES[LibVGASettings["bar_end_" .. side] or "gryphon"]
+    holder.shade:SetShown(figure ~= nil)
+    holder.foot = 0
+    if not figure then
+        holder.art:SetAtlas("ui-hud-actionbar-gryphon-" .. side)
+        holder.art:SetTexCoord(0, 1, 0, 1)
+        return read_draft(34), math.floor(read_draft(95) * 154 / 95 + 0.5), read_draft(95)
+    end
+    local name = library.media .. figure.file .. (side == "left" and "Left" or "Right")
+    local scale = read_draft(95) / END_DRAFT
+    local top = (END_CANVAS - figure.height) / END_CANVAS
+    for _, layer in ipairs({ holder.art, holder.shade }) do
+        layer:SetTexture(layer == holder.art and name or name .. "Shade")
+        layer:SetTexCoord(0, figure.width / END_CANVAS, top, 1)
+    end
+    holder.foot = math.floor(END_FOOT * scale + 0.5)
+    return math.floor(figure.overlap * scale + 0.5), math.floor(figure.width * scale + 0.5), math.floor(figure.height * scale + 0.5)
+end
+
 local function update_gryphons()
-    local overlap, height = read_draft(34), read_draft(95)
     for side, gryphon in pairs(mainbar.gryphons) do
-        local width = math.floor(height * 154 / 95 + 0.5)
+        local overlap, width, height = update_end_art(gryphon, side)
         gryphon:SetSize(width, height)
         gryphon:ClearAllPoints()
         if side == "left" then
-            gryphon:SetPoint("BOTTOMRIGHT", mainbar, "BOTTOMLEFT", overlap, 0)
+            gryphon:SetPoint("BOTTOMRIGHT", mainbar, "BOTTOMLEFT", overlap, -gryphon.foot)
         else
-            gryphon:SetPoint("BOTTOMLEFT", mainbar, "BOTTOMRIGHT", -overlap, 0)
+            gryphon:SetPoint("BOTTOMLEFT", mainbar, "BOTTOMRIGHT", -overlap, -gryphon.foot)
         end
     end
 end
 
 local function read_natural_width(two)
     local gap, bar = read_draft(14), mainbar.first_bar:GetWidth()
-    local micro = MicroMenuContainer and MicroMenuContainer:GetWidth() * mainbar.base.micro or 0
-    local bags = BagsBar and BagsBar:GetWidth() * mainbar.base.bags or 0
+    local micro = vga.game_menu and vga.game_menu:GetWidth() * mainbar.base.micro or 0
+    local bags = vga.bag_row and vga.bag_row:GetWidth() * mainbar.base.bags or 0
     local count = two and 1 or (read_three() and 3 or 2)
-    local bottom = micro + gap + count * bar + (count - 1) * gap + gap + bags
+    local bottom = micro + gap + count * bar + vga.read_page_switch_reach() + (count - 1) * gap + gap + bags
     local top = two and (read_three() and 2 * bar + gap or bar) or 0
     local gryphon = math.floor(read_draft(95) * 154 / 95 + 0.5) - read_draft(34)
     return math.max(bottom, top) + 2 * read_draft(8) + 2 * gryphon
@@ -300,8 +331,8 @@ local function update_fit()
     for _, frame in ipairs({ mainbar.first_bar, mainbar.second_bar, mainbar.third_bar, mainbar.gryphons.left, mainbar.gryphons.right }) do
         frame:SetScale(fit)
     end
-    if MicroMenuContainer then MicroMenuContainer:SetScale(mainbar.base.micro * fit) end
-    if BagsBar then BagsBar:SetScale(mainbar.base.bags * fit) end
+    if vga.game_menu then vga.game_menu:SetScale(mainbar.base.micro * fit) end
+    if vga.bag_row then vga.bag_row:SetScale(mainbar.base.bags * fit) end
 end
 
 local function update_area(key, inner, width, height)
@@ -336,8 +367,8 @@ local function update_free_bars()
 end
 
 local function update_loose()
-    update_loose_blizzard("menu", MicroMenuContainer, mainbar.base.micro)
-    update_loose_blizzard("bags", BagsBar, mainbar.base.bags)
+    update_loose_blizzard("menu", vga.game_menu, mainbar.base.micro)
+    update_loose_blizzard("bags", vga.bag_row, mainbar.base.bags)
     local block = mainbar.experience
     block:SetParent(mainbar.areas.xpbar)
     block:SetScale(library.read_size_step("xpbar"))
@@ -352,17 +383,18 @@ local function update_form()
     for _, gryphon in pairs(mainbar.gryphons) do gryphon:SetShown(not loose) end
     for _, key in ipairs(LOOSE_AREAS) do mainbar.areas[key]:SetShown(loose) end
     mainbar.base = mainbar.base or {
-        micro = MicroMenuContainer and MicroMenuContainer:GetScale() or 1, bags = BagsBar and BagsBar:GetScale() or 1,
-        micro_parent = MicroMenuContainer and MicroMenuContainer:GetParent(), bags_parent = BagsBar and BagsBar:GetParent(),
+        micro = 1, bags = 1, micro_parent = UIParent, bags_parent = UIParent,
     }
     if loose then return true end
-    if MicroMenuContainer then MicroMenuContainer:SetParent(mainbar.base.micro_parent) end
-    if BagsBar then BagsBar:SetParent(mainbar.base.bags_parent) end
+    if vga.game_menu then vga.game_menu:SetParent(mainbar.base.micro_parent) end
+    if vga.bag_row then vga.bag_row:SetParent(mainbar.base.bags_parent) end
     for _, bar in ipairs({ mainbar.first_bar, mainbar.second_bar, mainbar.third_bar }) do bar:SetParent(UIParent) end
     mainbar.experience:SetParent(mainbar)
     mainbar.experience:SetScale(1)
     return false
 end
+
+vga.main_pages = PAGES
 
 vga.bars = {
     count = #BARS, columns = COLUMNS, always_free = ALWAYS_FREE,
@@ -385,6 +417,7 @@ local function update_mainbar()
         return
     end
     update_put_away()
+    vga.update_game_menu()
     local loose = update_form()
     update_free_bars()
     if loose then
@@ -408,6 +441,8 @@ local function create_gryphons()
         local holder = CreateFrame("Frame", nil, UIParent)
         holder:SetFrameStrata("MEDIUM")
         holder:SetFrameLevel(100)
+        holder.shade = holder:CreateTexture(nil, "ARTWORK")
+        holder.shade:SetAllPoints()
         holder.art = holder:CreateTexture(nil, "OVERLAY")
         holder.art:SetAllPoints()
         holder.art:SetAtlas("ui-hud-actionbar-gryphon-" .. side)

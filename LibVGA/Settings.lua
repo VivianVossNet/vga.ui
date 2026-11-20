@@ -83,8 +83,9 @@ local function create_general_page(page)
     local frames = library.create_row(page, texts.background)
     frames.control = library.create_slider(frames, library.ground_stops, library.read_ground(), function(value)
         LibVGASettings.ground = value
-        library.update_elements()
+        library.update_grounds()
     end)
+    frames.control.on_settle = library.update_elements
     local dialogs = library.create_row(page, texts.dialogs)
     dialogs.control = library.create_slider(dialogs, library.dialog_stops, library.read_dialog_ground(), function(value)
         LibVGASettings.dialog = value
@@ -253,6 +254,8 @@ SLASH_LIBVGA1 = "/vga"
 local function update_from_command(message)
     if (message or ""):lower():match("^%s*edit") then
         library.update_edit(not library.editing, true)
+    elseif (message or ""):lower():match("^%s*overlap") then
+        library.render_overlaps()
     elseif (message or ""):lower():match("^%s*outline") then
         library.update_choice_setting("plate_outline", LibVGASettings.plate_outline == "light" and "thick" or "light")
     else

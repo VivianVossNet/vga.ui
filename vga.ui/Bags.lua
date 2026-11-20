@@ -72,14 +72,17 @@ local function update_button_parts(button)
         state:SetVertexColor(1, 1, 1, 0.15)
         state:SetAllPoints(button)
     end
-    if button.icon then button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+    if button.icon then
+        button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        library.update_cell_picture(button.icon, button, EDGE_WIDTH)
+    end
+    if button.Cooldown then library.update_cell_picture(button.Cooldown, button, EDGE_WIDTH) end
 end
 
 local function create_slot(holder, slot)
     local button = CreateFrame("ItemButton", nil, holder, "ContainerFrameItemButtonTemplate")
     button:SetID(slot)
     button.vga_ground = library.create_surface(button, "BACKGROUND", -6)
-    button.vga_notches = library.create_notches(button, "OVERLAY", 4)
     button.vga_edge = library.create_ring(button, "OVERLAY", 5, nil, true)
     button.vga_gem = button:CreateTexture(nil, "OVERLAY", nil, 6)
     button.vga_gem:Hide()
@@ -130,7 +133,6 @@ local function update_slot_look(button, item, new, quest)
     local radius = 2 * EDGE_WIDTH
     local edge, share = read_edge(item, quest)
     library.update_surface(button.vga_ground, 0, radius, SLOT_GROUND, SLOT_GROUND)
-    library.update_notches(button.vga_notches, button, radius, colours.ground)
     library.update_ring(button.vga_edge, EDGE_WIDTH, edge, share)
     if not new then library.delete_shimmer(button) end
 end

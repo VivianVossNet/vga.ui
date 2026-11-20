@@ -1,11 +1,13 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: LibVGA's money as the accepted draft draws it (manual/view/vga-windows.html .money): gold, silver and copper, each figure followed by its coin, the coin centred on the figure's line, four draft pixels between figure and coin and twelve between the groups; leading empty groups left out, the copper always shown; shared by every element that shows money.
+-- Scope: LibVGA's money as the accepted draft draws it (manual/view/vga-windows.html .money): gold, silver and copper, each figure followed by its coin, the coin centred on the figure's line, two draft pixels between figure and coin and six between the groups, closer than the draft's four and twelve since the owner's word of 20 November 2026 (K0539), so a separator beside the money reads as one; leading empty groups left out, the copper always shown; shared by every element that shows money.
 
--- {K0258} {K0388} {K0403}
+-- {K0258} {K0388} {K0403} {K0539}
 
 local library = LibVGA
 local DRAFT_BASE = 13
+local NEAR = 2
+local APART = 6
 local COINS = { { 10000, "CoinGold" }, { 100, "CoinSilver" }, { 1, "CoinCopper" } }
 
 function library.create_money(parent, colour)
@@ -21,7 +23,7 @@ end
 
 local function update_group(money, group, count, x)
     local scale = library.read_base() / DRAFT_BASE
-    local size, near = math.floor(10 * scale + 0.5), math.floor(4 * scale + 0.5)
+    local size, near = math.floor(10 * scale + 0.5), math.floor(NEAR * scale + 0.5)
     group.text:SetFontObject(library.read_frame_font(money.kind or "body"))
     group.text:SetText(count)
     group.text:ClearAllPoints()
@@ -33,7 +35,7 @@ local function update_group(money, group, count, x)
 end
 
 function library.update_money(money, copper)
-    local apart = math.floor(12 * library.read_base() / DRAFT_BASE + 0.5)
+    local apart = math.floor(APART * library.read_base() / DRAFT_BASE + 0.5)
     local left, x, shown = copper or 0, 0, false
     for index, coin in ipairs(COINS) do
         local group = money.groups[index]

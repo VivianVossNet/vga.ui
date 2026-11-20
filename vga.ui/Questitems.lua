@@ -1,6 +1,6 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The quest tracker's item boxes: a quest whose log carries a usable item gets a small box left of the tracker, its middle level with the quest's, in the look of the minimap's button slots - a dark ground, the item's icon rounded, a grey ring that turns gold under the mouse, the item's tooltip beside it -; a click uses the item through the game's secure action button. As the game forbids moving such a button in a fight, the boxes are laid out of combat only, the tracker's every-second refresh laying them again when the fight has ended; with the tracker hidden they hide.
+-- Scope: The quest tracker's item boxes: a quest whose log carries a usable item gets a small box left of the tracker, its middle level with the quest's, in the look of the minimap's button slots - a dark ground, the item's icon rounded, a grey ring that turns gold under the mouse, the item's tooltip beside it -; a click uses the item through the game's secure action button. A quest scrolled out of the tracker's view has no box. As the game forbids moving such a button in a fight, the boxes are laid out of combat only, the tracker's every-second refresh laying them again when the fight has ended; with the tracker hidden they hide.
 
 -- {K0469}
 
@@ -79,12 +79,19 @@ local function update_box(box, quest, tracker, item)
     box:Show()
 end
 
+local function check_in_view(quest, tracker)
+    local body = tracker.body
+    if not (body and body:GetTop() and body:GetBottom()) then return true end
+    local middle = (quest:GetTop() + quest:GetBottom()) / 2
+    return middle <= body:GetTop() and middle >= body:GetBottom()
+end
+
 function vga.update_quest_items(tracker, quests, shown)
     if InCombatLockdown() then return end
     local used = 0
     for index, data in ipairs(tracker:IsShown() and shown or {}) do
         local quest, item = quests[index], read_item(data.id)
-        if item and quest:GetTop() and tracker:GetLeft() then
+        if item and quest:GetTop() and tracker:GetLeft() and check_in_view(quest, tracker) then
             used = used + 1
             boxes[used] = boxes[used] or create_box()
             update_box(boxes[used], quest, tracker, item)

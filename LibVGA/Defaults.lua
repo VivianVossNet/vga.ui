@@ -1,16 +1,19 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The layout vga.ui is delivered with, the owner's own as he set it on 19 November 2026: a new character starts with it where no profile was saved or loaded before, and »Alles zurücksetzen …« returns to it. Places are kept from the nearest edges in the owner's screen units, so they fit every screen.
+-- Scope: The layout vga.ui is delivered with, the owner's own - his profile »Prinzessin« as it stood on 20 November 2026 (K0555), before that his layout of 19 November -: a new character starts with it where no profile was saved or loaded before, and »Alles zurücksetzen …« returns to it. Places are kept from the nearest edges in the owner's screen units, so they fit every screen - the bags too, from the lower right corner; the profile's flag that the chat's font was set is left out, so a new player's chat gets its 12 pixels.
 
--- {K0449}
+-- {K0449} {K0555}
 
 local library = LibVGA
 
 local DEFAULTS = {
     alignment = "grid",
-    arc_left = "range",
-    arc_right = "threat",
-    bags_pinned = true,
+    arc_left = "resource",
+    arc_right = "health",
+    arc_shape = "full",
+    bags_place = { "BOTTOMRIGHT", -417, 332 },
+    bar_end_left = "dragon",
+    bar_end_right = "dragon",
     bars_shown = { [4] = true, [5] = false, [6] = false, [7] = false, [8] = false },
     chat_sized = true,
     cursor = "on",
@@ -22,15 +25,21 @@ local DEFAULTS = {
     ground = 0.25,
     grounds = { party = 0, quests = 0.1, units = 0.25 },
     mainbar_form = "two",
+    menu_icons = "game",
     places = {
         bar4 = { "RIGHT", "RIGHT", -27, 9 },
         map = { "TOPRIGHT", "TOPRIGHT", -21, -23 },
-        quests = { "RIGHT", "RIGHT", -98, 181 },
+        quests = { "TOPRIGHT", "TOPRIGHT", -96, -320 },
     },
     plate_level = "number",
+    quest_most_height = 0.45,
+    quest_most_width = 302,
+    quests_outer = true,
+    reputation_colour = "hunter",
     size = "large",
-    sizes = {},
+    sizes = { bags = "small" },
     target_health = "absolute",
+    xp_both = "both",
     xp_colour = "mage",
     xp_labels = "on",
     xp_money = "on",

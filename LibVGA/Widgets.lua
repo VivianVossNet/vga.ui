@@ -34,8 +34,9 @@ local function create_widget_row(page, entry)
     row.control = library.create_slider(row, library.ground_stops, library.read_ground(entry.key), function(value)
         LibVGASettings.grounds[row.key] = value
         row.control.like = nil
-        library.update_elements()
+        library.update_grounds()
     end)
+    row.control.on_settle = library.update_elements
     row.control.row = row
     row.control:HookScript("OnMouseUp", update_reset)
     update_like(row)
