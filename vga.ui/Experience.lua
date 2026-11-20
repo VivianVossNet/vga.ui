@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The experience bar as the accepted draft draws it (manual/view/vga-xp.html, V1a): above it the level and the share in the light ink at the left, the rested bonus white at the right, without one a quiet »kein Bonus«, both set in far enough that the gryphons never cover them, after the level and share, in brackets, the time left to the next level, »Stufe 22 · 71 % (~28 m)«, reckoned from the experience of the last fifteen minutes and refreshed every minute or after every fight as the settings say, the brackets left out whole while no time is known; all three to be switched off; then the frame rate, the world latency and the addons' memory, 60 fps · 42 ms · 38 MB, and the money with the accepted coins (manual/view/vga-windows.html), each switched on and off, and the bag slots in use of all, »35/40«, yellow with ten or fewer left, orange with fewer than five, red when none is; the row laid as a table of equal columns over the width between the insets - level with its time, values, money and slots together in one column, parted by a small dot as the system values are, »2 · 7/24«, bonus -, the first column's content left-aligned, the last's right-aligned, every middle one's centred, and a column switched off or not needed gone, the others sharing its room; on its own tab of the settings, its colour chosen from three swatches; the bar the mage's blue by default, without the fine light streaks - silver or violet as the settings say, never green (K0567) -, its colour darkened a little towards grey while no rested bonus is left, rounded, in a black line, with ten fine divisions, moving like every other bar of LibVGA; the rested bonus, as the game shows it, a fainter underlay of the bar's colour at 0.3 opacity, swept by the bars' slanted shine at the same opacity whenever it grows - resting in a city, an inn or a camp - reaching beyond the fill as far as the bonus goes. While a faction is watched the bar shows its reputation instead, in a colour of its own chosen from three swatches - the hunter's green by default, gold or our orange, never blue -, hatched with light diagonal strokes: »Ruf« with the standing's name and the share at the left, the faction's name at the right, without a time column - or, as the settings say (»Ruf und Erfahrung: Beide«), both at once, each bar half as high, two pixels apart, the experience above with its texts, the reputation beneath (K0549). Laid by the main bar between its rows.
+-- Scope: The experience bar as the accepted draft draws it (manual/view/vga-xp.html, V1a): above it the level and the share in the light ink at the left, the rested bonus white at the right, without one a quiet »kein Bonus«, both set in far enough that the gryphons never cover them, after the level and share, in brackets, the time left to the next level, »Stufe 22 · 71 % (~28 m)«, reckoned from the experience of the last fifteen minutes and refreshed every minute or after every fight as the settings say, the brackets left out whole while no time is known; all three to be switched off; then the frame rate, the world latency and the addons' memory, 60 fps · 42 ms · 38 MB, the memory white below 200 MB, yellow from 200 to red at 300 (K0587), and the money with the accepted coins (manual/view/vga-windows.html), each switched on and off, and the bag slots in use of all, »35/40«, yellow with ten or fewer left, orange with fewer than five, red when none is; the row laid as a table of equal columns over the width between the insets - level with its time, values, money and slots together in one column, parted by a small dot as the system values are, »2 · 7/24«, bonus -, the first column's content left-aligned, the last's right-aligned, every middle one's centred, and a column switched off or not needed gone, the others sharing its room; on its own tab of the settings, its colour chosen from three swatches; the bar the mage's blue by default, without the fine light streaks - silver or violet as the settings say, never green (K0567) -, its colour darkened a little towards grey while no rested bonus is left, rounded, in a black line, with ten fine divisions, moving like every other bar of LibVGA; the rested bonus, as the game shows it, a fainter underlay of the bar's colour at 0.3 opacity, swept by the bars' slanted shine at the same opacity whenever it grows - resting in a city, an inn or a camp - reaching beyond the fill as far as the bonus goes. While a faction is watched the bar shows its reputation instead, in a colour of its own chosen from three swatches - the hunter's green by default, gold or our orange, never blue -, hatched with light diagonal strokes: »Ruf« with the standing's name and the share at the left, the faction's name at the right, without a time column - or, as the settings say (»Ruf und Erfahrung: Beide«), both at once, each bar half as high, two pixels apart, the experience above with its texts, the reputation beneath (K0549). Laid by the main bar between its rows.
 
--- {K0298} {K0300} {K0375} {K0378} {K0383} {K0388} {K0397} {K0404} {K0428} {K0430} {K0437} {K0451} {K0483} {K0516} {K0519} {K0526} {K0531} {K0549} {K0567}
+-- {K0298} {K0300} {K0375} {K0378} {K0383} {K0388} {K0397} {K0404} {K0428} {K0430} {K0437} {K0451} {K0483} {K0516} {K0519} {K0526} {K0531} {K0549} {K0567} {K0587}
 
 local _, vga = ...
 local library = LibVGA
@@ -27,6 +27,8 @@ local WARM = { 1, 0.82, 0.25 }
 local ALARM = { 0.93, 0.27, 0.22 }
 local ORANGE = { 0.96, 0.55, 0.2 }
 local WHITE = { 1, 1, 1 }
+local MEMORY_YELLOW = 200
+local MEMORY_RED = 300
 local MEMORY_EVERY = 10
 local memory = { used = 0, read = 0 }
 
@@ -127,9 +129,14 @@ local function read_system()
     return math.floor((GetFramerate() or 0) + 0.5), world or 0, math.floor(read_memory() / 1024 + 0.5)
 end
 
+local function read_memory_warning(used)
+    if used < MEMORY_YELLOW then return read_warning(0, MEMORY_YELLOW, MEMORY_RED, true) end
+    return read_warning(used, MEMORY_YELLOW, MEMORY_RED, true)
+end
+
 local function render_system()
     local frames, latency, used = read_system()
-    return string.format("%s%d fps|r · %s%d ms|r · %s%d MB|r", read_warning(frames, 30, 24, false), frames, read_warning(latency, 150, 300, true), latency, read_warning(used, 150, 300, true), used)
+    return string.format("%s%d fps|r · %s%d ms|r · %s%d MB|r", read_warning(frames, 30, 24, false), frames, read_warning(latency, 150, 300, true), latency, read_memory_warning(used), used)
 end
 
 local function read_slots_colour(free)
@@ -433,3 +440,4 @@ events:SetScript("OnEvent", function(_, event)
 end)
 
 vga.read_system, vga.read_warning_colour = read_system, read_warning_colour
+vga.read_memory_warning = read_memory_warning

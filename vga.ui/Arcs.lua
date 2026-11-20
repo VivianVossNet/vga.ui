@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 -- Scope: Two transparent arcs either side of the character, wide enough to clear it and centred on its middle, as manual/view/vga-hud.html draws them (D): twelve segments each, lit one by one - or, as the settings say (arc_shape), half arcs, half as high, of six segments for the same values, the beads closer together -; behind each arc, as the settings say (»Rahmen«, off by default), a broad stroke of the frames' own ground and opacity, rounded at its ends, eight draft pixels clear of the segments and beads all round, so the arc reads on a light ground (K0563); an arc with nothing to show fades slowly out, each on its own, and back in when it has. Each side shows what the settings choose - the range, the threat, the target's cast or its health, the player's own health - filled in green as the target's, with or without a target -, the player's own resource, named as the game names the class's power - Mana, Wut, Energie, for a druid all three -, filling the arc in the power bar's colour, with or without a target, a rogue's or cat's combo points as five beads beside it, lit in VGA's orange when earned -, or nothing -, by default the range at the left and the threat at the right. The range to an attackable target filling from its foot as the target comes nearer - the distance known in steps by the game's own range checks - the player's harmful spells and a few items, each at the range the game gives its spell, and the interact distances of 10 and 28 yards -, shown as the smallest step the target stands within, »>« before the largest when beyond it -, its lit segments in one colour that tells the reach - red when the target stands near, through orange and yellow to a deep green at the edge of the best range of the player's class, by the steps' yards -; every segment grey where it stands beyond that range or beyond every step; the threat drawn from the target fills in the threat meter's five colours, the health in green, each segment set by the game from the value even where it is secret; the target's cast fills as it runs, gold while it can be interrupted, grey while not, its spell's name at the head - for the moment to interrupt. Each arc's value stands at its head or its foot, or not at all, as the settings say. At each arc's foot a small gold corner, the only part of the arcs that takes the mouse, opens the settings on the arcs' tab, where every change shows live; there each arc is one row with a pop-up menu whose sections are »Ich« - the resource, the own health - and »Ziel« - range, threat, cast, health -, then none (K0564, K0565). Free to be placed while arranging.
 
--- {K0392} {K0393} {K0395} {K0400} {K0416} {K0417} {K0418} {K0501} {K0502} {K0563} {K0564} {K0574}
+-- {K0392} {K0393} {K0395} {K0400} {K0416} {K0417} {K0418} {K0501} {K0502} {K0563} {K0564} {K0574} {K0581} {K0582} {K0583}
 
 local _, vga = ...
 local library = LibVGA
@@ -29,6 +29,9 @@ local BANDS = {
 }
 local BEST = { HUNTER = 75, MAGE = 133, WARLOCK = 686, PRIEST = 585, DRUID = 5176, SHAMAN = 403, WARRIOR = 78, ROGUE = 1752 }
 local RANGE_ITEMS = { 8149, 10645, 835, 4941, 18904, 13289, 9328, 7734, 4945, 17202 }
+local RANGED_YARDS = { HUNTER = 35, MAGE = 35, WARLOCK = 30, PRIEST = 30, DRUID = 30, SHAMAN = 30, WARRIOR = 30, ROGUE = 30 }
+local MELEE_YARDS = 5
+local NEAR = 11
 local SAMPLE = 67
 local SAMPLE_YARDS = 13
 local previews = {}
@@ -179,6 +182,13 @@ local function write_item_checks()
     end
 end
 
+local function write_steps_measure()
+    local steps = {}
+    for _, step in ipairs(checks) do steps[#steps + 1] = step[1] end
+    LibVGASettings.measures = LibVGASettings.measures or {}
+    LibVGASettings.measures.range_steps = table.concat(steps, " ")
+end
+
 local function write_checks()
     checks = {}
     write_check(10, function() return CheckInteractDistance("target", 3) end)
@@ -186,6 +196,7 @@ local function write_checks()
     pcall(write_spell_checks)
     pcall(write_item_checks)
     table.sort(checks, function(one, other) return one[1] < other[1] end)
+    write_steps_measure()
 end
 
 local function read_range()
@@ -209,12 +220,21 @@ local function check_best_range()
     return C_Spell and C_Spell.IsSpellInRange and C_Spell.IsSpellInRange(spell, "target") == true
 end
 
+local function read_reach_colour(yards)
+    local _, class = UnitClass("player")
+    local ranged = RANGED_YARDS[class or ""]
+    if not ranged then return read_range_colour(yards, read_best_yards(), yards and check_best_range()) end
+    if not yards or yards > ranged then return OUT_OF_REACH end
+    if yards <= MELEE_YARDS then return REACH[1] end
+    return yards <= NEAR and REACH[3] or REACH[4]
+end
+
 local function update_range(side)
     local yards, foe = read_range(), UnitCanAttack("player", "target")
     side.wanted = (yards or foe) and 1 or 0
     local share = yards and (RANGE_MOST - yards) / RANGE_MOST or 0
-    local lit, best = math.max(foe and 1 or 0, math.ceil(share * read_count())), yards and check_best_range()
-    local colour = read_range_colour(yards, read_best_yards(), best)
+    local lit = math.max(foe and 1 or 0, math.ceil(share * read_count()))
+    local colour = read_reach_colour(yards)
     if colour == OUT_OF_REACH then lit = read_count() end
     for index, segment in ipairs(side.segments) do
         segment:SetStatusBarColor(colour[1], colour[2], colour[3], 0.9)
@@ -459,3 +479,4 @@ events:SetScript("OnEvent", function(_, event)
 end)
 
 vga.read_range_colour = read_range_colour
+vga.read_reach_colour = read_reach_colour

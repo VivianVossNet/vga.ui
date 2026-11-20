@@ -115,6 +115,7 @@ end
 local function update_fonts()
     local _, plain, medium = library.read_face()
     local shapes = {
+        tiny = { plain, -2 },
         small = { plain, -1 },
         body = { plain, 0 },
         bold = { medium, 0 },
