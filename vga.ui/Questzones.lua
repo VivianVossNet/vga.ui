@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: The quest tracker's zones as manual/view/vga-questzones.html draws B (K0547): with »Zonen: Alle« on the tab Quests the watched quests are grouped by their zone, each group under a label of its own - a thin line above it, a chevron, the zone's name in small capitals and the count of its quests at the right, all in VGA's orange -; the zone the player stands in first, always open, its name followed by a quiet »· hier«; the others by name, closed, a click on one opening it and closing the one opened before, a second click closing it again. With »Aktuelle«, the default, the tracker shows the player's zone alone, as before. Quests.lua lays the groups.
+-- Scope: The quest tracker's zones as manual/view/vga-questzones.html draws B (K0547): with »Zonen: Alle« on the tab Quests the watched quests are grouped by their zone, each group under a label of its own - a thin line above it, a chevron, the zone's name in small capitals and the count of its quests at the right, all in VGA's orange -; the zone the player stands in first, open, its name followed by a quiet »· hier«, a click closing and opening it (K0557); the others by name, closed, a click on one opening it and closing the one opened before, a second click closing it again. With »Aktuelle«, the default, the tracker shows the player's zone alone, as before. Quests.lua lays the groups.
 
--- {K0547}
+-- {K0547} {K0557}
 
 local _, vga = ...
 local library = LibVGA
@@ -13,7 +13,7 @@ local CHEVRON = 9
 local QUIET = "|cff9a968c"
 local CAPITALS = { ["ä"] = "Ä", ["ö"] = "Ö", ["ü"] = "Ü", ["é"] = "É", ["è"] = "È", ["à"] = "À", ["ç"] = "Ç", ["ñ"] = "Ñ" }
 local LINE = { 0.173, 0.184, 0.208 }
-local open_zone
+local open_zone, here_closed
 
 local function read_draft(pixels)
     return math.floor(pixels * library.read_base() / DRAFT_BASE + 0.5)
@@ -52,11 +52,16 @@ function vga.read_zone_groups(quests, here_name)
 end
 
 function vga.check_zone_open(group)
-    return group.here or group.name == open_zone
+    if group.here then return not here_closed end
+    return group.name == open_zone
 end
 
 local function render_toggle(label)
-    open_zone = open_zone ~= label.zone and label.zone or nil
+    if label.here then
+        here_closed = not here_closed
+    else
+        open_zone = open_zone ~= label.zone and label.zone or nil
+    end
     if vga.update_quest_tracker then vga.update_quest_tracker() end
 end
 
@@ -74,6 +79,7 @@ function vga.create_zone_label(parent)
     label.chevron:SetVertexColor(colours.orange[1], colours.orange[2], colours.orange[3], 1)
     label.name = library.create_text(label, "caption", colours.orange)
     label.count = library.create_text(label, "small", colours.orange)
+    label:RegisterForClicks("AnyUp")
     label:SetScript("OnClick", render_toggle_safely)
     return label
 end
@@ -84,7 +90,7 @@ function vga.update_zone_label(label, group, top, width)
     label:SetPoint("TOPLEFT", label:GetParent(), "TOPLEFT", 0, -(top - (label:GetParent().top or 0)))
     label:SetSize(width, height)
     label:Show()
-    label.zone = group.name
+    label.zone, label.here = group.name, group.here
     label.line:ClearAllPoints()
     label.line:SetPoint("TOPLEFT")
     label.line:SetPoint("TOPRIGHT")
