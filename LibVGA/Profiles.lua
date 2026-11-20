@@ -1,8 +1,8 @@
 -- Copyright 2026 Vivian Voss. Code by Vivian Voss. Licensed under the BSD-3-Clause.
 -- SPDX-License-Identifier: BSD-3-Clause
--- Scope: Each character's own layout and the account's named profiles: a character keeps its settings - places, sizes, grounds, every choice - for itself; a layout is saved under a name for the whole account and loaded by any character; a new character starts with the profile saved or loaded last, the first one after this change with the layout the account had before, and on a fresh installation with the delivered layout; the settings' tab »Profile« - a name and »Speichern«, then every saved profile with »Laden«, »Überschreiben« - the present layout saved over it - and »Löschen«, the last two asking once.
+-- Scope: Each character's own layout and the account's named profiles: a character keeps its settings - places, sizes, grounds, every choice - for itself; a layout is saved under a name for the whole account and loaded by any character; a new character starts with the profile saved or loaded last, the first one after this change with the layout the account had before, and on a fresh installation with the delivered layout; the settings' tab »Profile« - a name and behind it »Speichern«, active only once the name holds at least three characters, each a letter of a European script, a digit, an apostrophe, a hyphen or a space inside it (K0576), then every saved profile with »Laden«, »Überschreiben« - the present layout saved over it - and »Löschen«, the last two asking once.
 
--- {K0387} {K0449}
+-- {K0387} {K0449} {K0576}
 
 local library = LibVGA
 local colours = library.colours
@@ -103,17 +103,71 @@ local function read_names()
     return names
 end
 
+local NAME_LEAST = 3
+local NAME_MARKS = { [32] = true, [39] = true, [45] = true, [0x2019] = true }
+local NAME_SCRIPTS = { { 0x30, 0x39 }, { 0x41, 0x5A }, { 0x61, 0x7A }, { 0xC0, 0xD6 }, { 0xD8, 0xF6 }, { 0xF8, 0x24F }, { 0x370, 0x3FF }, { 0x400, 0x4FF }, { 0x1E00, 0x1EFF } }
+
+local function read_code_point(character)
+    local first = character:byte(1)
+    if first < 0x80 then return first end
+    local code = first % (first >= 0xF0 and 0x08 or first >= 0xE0 and 0x10 or 0x20)
+    for index = 2, #character do code = code * 0x40 + character:byte(index) % 0x40 end
+    return code
+end
+
+local function check_name_character(code)
+    if NAME_MARKS[code] then return true end
+    for _, range in ipairs(NAME_SCRIPTS) do
+        if code >= range[1] and code <= range[2] then return true end
+    end
+    return false
+end
+
+local function read_name(input)
+    return (input:GetText() or ""):match("^%s*(.-)%s*$")
+end
+
+local function check_name(name)
+    local count = 0
+    for character in name:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        if not check_name_character(read_code_point(character)) then return false end
+        count = count + 1
+    end
+    return count >= NAME_LEAST
+end
+
+local function update_save_enabled(input)
+    local valid = check_name(read_name(input))
+    input.save:SetEnabled(valid)
+    input.save:SetAlpha(valid and 1 or 0.4)
+end
+
 local function write_input(input)
-    local name = (input:GetText() or ""):match("^%s*(.-)%s*$")
-    if name ~= "" then write_profile(name) end
+    local name = read_name(input)
+    if check_name(name) then write_profile(name) end
+end
+
+local function create_name_control(row)
+    local control = CreateFrame("Frame", nil, row)
+    local input = create_input(control)
+    update_input(input)
+    input.save = library.create_button(control, library.texts.save, "gold", function() write_input(input) end)
+    library.update_button(input.save)
+    local gap = library.read_size(-2)
+    input:SetPoint("LEFT", control, "LEFT")
+    input.save:SetPoint("LEFT", input, "RIGHT", gap, 0)
+    control:SetSize(input:GetWidth() + gap + input.save:GetWidth(), math.max(input:GetHeight(), input.save:GetHeight()))
+    input:SetScript("OnEnterPressed", write_input)
+    input:SetScript("OnTextChanged", update_save_enabled)
+    update_save_enabled(input)
+    control.input = input
+    return control
 end
 
 function library.create_profiles_page(page)
     local texts = library.texts
     local named = library.create_row(page, texts.profile_name)
-    named.control = create_input(named)
-    update_input(named.control)
-    named.control:SetScript("OnEnterPressed", write_input)
+    named.control = create_name_control(named)
     local heading = library.create_row(page, texts.saved_profiles, "heading")
     page.rows = { named, heading }
     heading.members = {}
@@ -128,6 +182,4 @@ function library.create_profiles_page(page)
         page.rows[#page.rows + 1] = none
         heading.members[1] = none
     end
-    local save = library.create_button(page, texts.save, "gold", function() write_input(named.control) end)
-    page.foot = { save }
 end
